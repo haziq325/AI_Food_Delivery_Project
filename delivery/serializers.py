@@ -1,22 +1,26 @@
 from rest_framework import serializers
-from .models import MapNode, Restaurant, MenuItem
+from .models import MapNode, Restaurant, MenuItem, MapEdge
 
-# For the AI Lead: Map Coordinates
 class MapNodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = MapNode
         fields = '__all__'
 
-# For the UI Lead: Restaurant Menus
+class MapEdgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MapEdge
+        fields = '__all__'
+
 class MenuItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = MenuItem
-        fields = ['id', 'name', 'price', 'description', 'category']
+        fields = '__all__'
 
 class RestaurantSerializer(serializers.ModelSerializer):
-    # This nests the menu items directly inside the restaurant object
+    # This grabs all the menu items linked to this restaurant
     menu_items = MenuItemSerializer(many=True, read_only=True, source='menuitem_set')
-
+    
     class Meta:
         model = Restaurant
-        fields = ['id', 'name', 'address', 'rating', 'menu_items']
+        fields = '__all__'
+    
