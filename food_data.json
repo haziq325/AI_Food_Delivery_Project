@@ -1,0 +1,277 @@
+[
+  {
+    "name": "Burger O'Clock",
+    "cuisine": "Fast Food",
+    "rating": 4.6,
+    "average_delivery_time": 30,
+    "menu": [
+      {"name": "Messy Meat Burger", "price": 850.00},
+      {"name": "Gourmet Fries", "price": 350.00},
+      {"name": "Oreo Shake", "price": 450.00}
+    ]
+  },
+  {
+    "name": "Student Biryani",
+    "cuisine": "Pakistani",
+    "rating": 4.2,
+    "average_delivery_time": 45,
+    "menu": [
+      {"name": "Chicken Biryani (Single)", "price": 400.00},
+      {"name": "Zarda", "price": 250.00},
+      {"name": "Raita", "price": 50.00}
+    ]
+  },
+  {
+    "name": "Kolachi",
+    "cuisine": "BBQ",
+    "rating": 4.8,
+    "average_delivery_time": 50,
+    "menu": [
+      {"name": "Peshawari Karahi", "price": 1800.00},
+      {"name": "Chicken Tikka", "price": 600.00},
+      {"name": "Garlic Naan", "price": 100.00}
+    ]
+  },
+  {
+    "name": "Xander's",
+    "cuisine": "Cafe",
+    "rating": 4.7,
+    "average_delivery_time": 35,
+    "menu": [
+      {"name": "Margherita Pizza", "price": 1200.00},
+      {"name": "Fettuccine Alfredo", "price": 1100.00},
+      {"name": "Iced Latte", "price": 550.00}
+    ]
+  },
+  {
+    "name": "BBQ Tonight",
+    "cuisine": "BBQ",
+    "rating": 4.5,
+    "average_delivery_time": 40,
+    "menu": [
+      {"name": "Malai Boti", "price": 950.00},
+      {"name": "Reshmi Kabab", "price": 850.00},
+      {"name": "Mutton Ribs", "price": 2200.00}
+    ]
+  },
+  {
+    "name": "Ginsoy",
+    "cuisine": "Chinese",
+    "rating": 4.4,
+    "average_delivery_time": 45,
+    "menu": [
+      {"name": "Kung Pao Chicken", "price": 1100.00},
+      {"name": "Beef Chilli Dry", "price": 1250.00},
+      {"name": "Chicken Chow Mein", "price": 850.00}
+    ]
+  },
+  {
+    "name": "Chop Chop Wok",
+    "cuisine": "Pan-Asian",
+    "rating": 4.6,
+    "average_delivery_time": 35,
+    "menu": [
+      {"name": "Khao Suey", "price": 950.00},
+      {"name": "3 Step Wok", "price": 1050.00},
+      {"name": "Dynamite Prawns", "price": 1300.00}
+    ]
+  },
+  {
+    "name": "California Pizza",
+    "cuisine": "Pizza",
+    "rating": 4.3,
+    "average_delivery_time": 40,
+    "menu": [
+      {"name": "Chicken Fajita (Large)", "price": 1899.00},
+      {"name": "Cheese Lover (Medium)", "price": 1299.00},
+      {"name": "Garlic Bread with Cheese", "price": 450.00}
+    ]
+  },
+  {
+    "name": "14th Street Pizza",
+    "cuisine": "Pizza",
+    "rating": 4.4,
+    "average_delivery_time": 45,
+    "menu": [
+      {"name": "Original Xtreme (20 Inch)", "price": 2899.00},
+      {"name": "Chicken Tikka Slice", "price": 450.00},
+      {"name": "Potato Skins", "price": 550.00}
+    ]
+  },
+  {
+    "name": "Kaybees",
+    "cuisine": "Fast Food",
+    "rating": 4.1,
+    "average_delivery_time": 30,
+    "menu": [
+      {"name": "Club Sandwich", "price": 650.00},
+      {"name": "Chicken Broast (Quarter)", "price": 550.00},
+      {"name": "Zinger Burger", "price": 500.00}
+    ]
+  },
+  {
+    "name": "OPTP",
+    "cuisine": "Fast Food",
+    "rating": 4.2,
+    "average_delivery_time": 25,
+    "menu": [
+      {"name": "GMC Burger", "price": 750.00},
+      {"name": "Southern Fried Chicken", "price": 650.00},
+      {"name": "Masala Fries", "price": 300.00}
+    ]
+  },
+  {
+    "name": "Zameer Ansari",
+    "cuisine": "BBQ",
+    "rating": 4.7,
+    "average_delivery_time": 50,
+    "menu": [
+      {"name": "Dhaga Kabab", "price": 850.00},
+      {"name": "Chicken Tikka", "price": 450.00},
+      {"name": "Puri Paratha", "price": 100.00}
+    ]
+  },
+  {
+    "name": "Javed Nihari",
+    "cuisine": "Pakistani",
+    "rating": 4.8,
+    "average_delivery_time": 55,
+    "menu": [
+      {"name": "Maghaz Nihari", "price": 1200.00},
+      {"name": "Nalli Nihari", "price": 1100.00},
+      {"name": "Sheermal", "price": 120.00}
+    ]
+  },
+  {
+    "name": "Waheed Kabab House",
+    "cuisine": "Pakistani",
+    "rating": 4.6,
+    "average_delivery_time": 45,
+    "menu": [
+      {"name": "Fry Kabab", "price": 800.00},
+      {"name": "Chicken Karahi (Half)", "price": 1300.00},
+      {"name": "Roghni Naan", "price": 80.00}
+    ]
+  },
+  {
+    "name": "Cafe Aylanto",
+    "cuisine": "Fine Dining",
+    "rating": 4.5,
+    "average_delivery_time": 60,
+    "menu": [
+      {"name": "Moroccan Chicken", "price": 1950.00},
+      {"name": "Beef Steak", "price": 2800.00},
+      {"name": "Penne Arrabiata", "price": 1450.00}
+    ]
+  },
+  {
+    "name": "Espresso",
+    "cuisine": "Cafe",
+    "rating": 4.3,
+    "average_delivery_time": 35,
+    "menu": [
+      {"name": "Cappuccino", "price": 650.00},
+      {"name": "Chicken Caesar Wrap", "price": 950.00},
+      {"name": "Chocolate Brownie", "price": 550.00}
+    ]
+  },
+  {
+    "name": "KFC",
+    "cuisine": "Fast Food",
+    "rating": 4.2,
+    "average_delivery_time": 30,
+    "menu": [
+      {"name": "Zinger Burger", "price": 650.00},
+      {"name": "Mighty Zinger", "price": 950.00},
+      {"name": "Hot Wings (10 Pcs)", "price": 700.00}
+    ]
+  },
+  {
+    "name": "McDonald's",
+    "cuisine": "Fast Food",
+    "rating": 4.1,
+    "average_delivery_time": 25,
+    "menu": [
+      {"name": "Big Mac", "price": 750.00},
+      {"name": "McChicken", "price": 550.00},
+      {"name": "Large French Fries", "price": 400.00}
+    ]
+  },
+  {
+    "name": "Hardee's",
+    "cuisine": "Fast Food",
+    "rating": 4.4,
+    "average_delivery_time": 35,
+    "menu": [
+      {"name": "Super Star Burger", "price": 1150.00},
+      {"name": "Curly Fries", "price": 450.00},
+      {"name": "Angus Thickburger", "price": 1450.00}
+    ]
+  },
+  {
+    "name": "Biryani Centre",
+    "cuisine": "Pakistani",
+    "rating": 4.0,
+    "average_delivery_time": 40,
+    "menu": [
+      {"name": "Chicken Biryani", "price": 450.00},
+      {"name": "Beef Biryani", "price": 500.00},
+      {"name": "Shami Kabab", "price": 150.00}
+    ]
+  },
+  {
+    "name": "White Biryani",
+    "cuisine": "Pakistani",
+    "rating": 4.3,
+    "average_delivery_time": 45,
+    "menu": [
+      {"name": "White Chicken Biryani", "price": 550.00},
+      {"name": "Chicken Malai Boti", "price": 750.00},
+      {"name": "Kheer", "price": 250.00}
+    ]
+  },
+  {
+    "name": "Domino's Pizza",
+    "cuisine": "Pizza",
+    "rating": 4.2,
+    "average_delivery_time": 30,
+    "menu": [
+      {"name": "Tex-Mex (Large)", "price": 1999.00},
+      {"name": "Pepperoni (Medium)", "price": 1399.00},
+      {"name": "Choco Lava Cake", "price": 450.00}
+    ]
+  },
+  {
+    "name": "Subway",
+    "cuisine": "Healthy",
+    "rating": 4.0,
+    "average_delivery_time": 25,
+    "menu": [
+      {"name": "Roasted Chicken Breast (6 Inch)", "price": 650.00},
+      {"name": "Chicken Teriyaki (Footlong)", "price": 1200.00},
+      {"name": "Chocolate Chip Cookie", "price": 180.00}
+    ]
+  },
+  {
+    "name": "Meerath Kabab House",
+    "cuisine": "BBQ",
+    "rating": 4.4,
+    "average_delivery_time": 45,
+    "menu": [
+      {"name": "Seekh Kabab", "price": 600.00},
+      {"name": "Behari Kabab", "price": 850.00},
+      {"name": "Puri Paratha", "price": 90.00}
+    ]
+  },
+  {
+    "name": "Roasters",
+    "cuisine": "American",
+    "rating": 4.5,
+    "average_delivery_time": 50,
+    "menu": [
+      {"name": "Parmesan Crusted Chicken", "price": 1650.00},
+      {"name": "Jalapeno Burger", "price": 1050.00},
+      {"name": "Molten Lava Cake", "price": 650.00}
+    ]
+  }
+]
