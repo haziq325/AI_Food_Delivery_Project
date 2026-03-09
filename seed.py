@@ -8,6 +8,9 @@ django.setup()
 
 from delivery.models import User, Restaurant, MenuItem, MapNode, MapEdge
 
+# Import the big lists from your friend's file
+from map_data import MapNode as node_list, MapEdge as edge_list
+
 def seed_database_from_json():
     print("Clearing old data...")
     User.objects.all().delete()
@@ -19,14 +22,26 @@ def seed_database_from_json():
     # --- 1. SEED MAP NODES & EDGES (For the AI) ---
     print("Creating Map Nodes (Intersections)...")
     
-    node_a = MapNode.objects.create(name="Clifton Block 5", x_coordinate=0.0, y_coordinate=0.0)
-    node_b = MapNode.objects.create(name="DHA Phase 6", x_coordinate=2.0, y_coordinate=0.0)
-    node_c = MapNode.objects.create(name="Saddar", x_coordinate=0.0, y_coordinate=3.0)
+    # We will save the nodes in a dictionary so we can connect them later
+    created_nodes = {}
+    
+    for item in node_list:
+        node = MapNode.objects.create(
+            node_id=item['Node_id'],     
+            name=item['Name'],
+            x_coordinate=item['X_Coordinate'],
+            y_coordinate=item['Y_Coordinate']
+        )
+        created_nodes[item['Node_id']] = node 
 
     print("Creating Map Edges (Roads)...")
-    MapEdge.objects.create(from_node=node_a, to_node=node_b, distance=2.5)
-    MapEdge.objects.create(from_node=node_b, to_node=node_c, distance=4.1)
-    MapEdge.objects.create(from_node=node_a, to_node=node_c, distance=3.2)
+    for item in edge_list:
+        MapEdge.objects.create(
+            edge_id=item['Edge_id'],     
+            from_node=created_nodes[item['StartsAt']],
+            to_node=created_nodes[item['EndsAt']],
+            distance=item['Distance']
+        )
 
     # --- 2. LOAD RESTAURANTS FROM JSON ---
     print("Loading data from local JSON file...")
