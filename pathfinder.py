@@ -49,8 +49,8 @@ def calculate_delivery_time(distance, speed_kmh=20):
     time_minutes = time_hours * 60
     return round(time_minutes, 2)
 
+
 if __name__ == "__main__":
-    # Example: Delivery from Burger King (Node 3) to East Gate (Node 8)
     start = 3
     end = 8
     path, dist = get_shortest_path(start, end)
