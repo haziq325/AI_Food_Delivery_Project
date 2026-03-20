@@ -44,7 +44,11 @@ def create_order(request):
     # ---------------------------------------------------------
     # 3. Trigger the n8n Webhook for the Email Automation
     # ---------------------------------------------------------
-    n8n_webhook_url = "https://sibyl-tetradynamous-griselda.ngrok-free.dev/webhook-test/order-placed" 
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    n8n_webhook_url = os.environ.get('N8N_WEBHOOK_URL', "https://sibyl-tetradynamous-griselda.ngrok-free.dev/webhook-test/order-placed")
     
     # NEW: Fetch the actual names from the database using the IDs!
     # (Using 'pk' is a Django trick that automatically finds the primary key, even if it's custom named)

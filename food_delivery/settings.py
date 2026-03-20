@@ -79,7 +79,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'food_delivery_db', # You will create this in Step 5
         'USER': 'postgres',
-        'PASSWORD': '1998',
+        'PASSWORD': 'sarim',
         'HOST': 'localhost',
         'PORT': '5432',
     }

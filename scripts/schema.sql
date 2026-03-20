@@ -18,9 +18,9 @@ CREATE TABLE MapNodes (
 -- MapEdges Table
 CREATE TABLE MapEdges (
     Edge_id SERIAL PRIMARY KEY,
-    StartsAt INTEGER NOT NULL REFERENCES MapNodes(Node_id),
-    EndsAt INTEGER NOT NULL REFERENCES MapNodes(Node_id),
-    Distance DOUBLE PRECISION NOT NULL
+    StartsAt INTEGER NOT NULL REFERENCES MapNodes(Node_id) ON DELETE CASCADE,
+    EndsAt INTEGER NOT NULL REFERENCES MapNodes(Node_id) ON DELETE CASCADE,
+    Distance DOUBLE PRECISION NOT NULL CHECK (Distance > 0)
 );
 
 -- Users Table
@@ -45,29 +45,34 @@ CREATE TABLE Restaurants (
 -- MenuItems Table
 CREATE TABLE MenuItems (
     Item_id SERIAL PRIMARY KEY,
-    Restaurant_id INTEGER NOT NULL REFERENCES Restaurants(Restaurant_id),
+    Restaurant_id INTEGER NOT NULL REFERENCES Restaurants(Restaurant_id) ON DELETE CASCADE,
     Name VARCHAR(255) NOT NULL,
-    Price NUMERIC(8,2) NOT NULL
+    Price NUMERIC(8,2) NOT NULL CHECK (Price > 0)
 );
+
+-- Indexes on MenuItems
+CREATE INDEX idx_menuitem_restaurant ON MenuItems(Restaurant_id);
 
 -- Orders Table
 CREATE TABLE Orders (
     Order_id SERIAL PRIMARY KEY,
-    User_id INTEGER NOT NULL REFERENCES Users(User_id),
-    Restaurant_id INTEGER NOT NULL REFERENCES Restaurants(Restaurant_id),
+    User_id INTEGER NOT NULL REFERENCES Users(User_id) ON DELETE CASCADE,
+    Restaurant_id INTEGER NOT NULL REFERENCES Restaurants(Restaurant_id) ON DELETE CASCADE,
     Total_Price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     Status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-    Rating INTEGER NULL
+    Rating INTEGER NULL CHECK (Rating >= 1 AND Rating <= 5),
+    Created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Indexes on Orders
+CREATE INDEX idx_order_user ON Orders(User_id);
+CREATE INDEX idx_order_restaurant ON Orders(Restaurant_id);
+CREATE INDEX idx_order_status ON Orders(Status);
 
 -- OrderItems Table
 CREATE TABLE OrderItems (
     Order_Item_id SERIAL PRIMARY KEY,
-    Order_id INTEGER NOT NULL REFERENCES Orders(Order_id),
-    Menu_Item_id INTEGER NOT NULL REFERENCES MenuItems(Item_id),
+    Order_id INTEGER NOT NULL REFERENCES Orders(Order_id) ON DELETE CASCADE,
+    Menu_Item_id INTEGER NOT NULL REFERENCES MenuItems(Item_id) ON DELETE CASCADE,
     Quantity INTEGER NOT NULL DEFAULT 1
 );
-
-
-
-

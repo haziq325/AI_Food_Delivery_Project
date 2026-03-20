@@ -49,12 +49,16 @@ def seed_database():
     try:
         with open(json_path, 'r', encoding='utf-8') as file:
             restaurants_data = json.load(file)
-            for data in restaurants_data:
+            node_ids = list(created_nodes.keys())
+            for i, data in enumerate(restaurants_data):
+                # Assign each restaurant to a map node (round-robin)
+                assigned_node = created_nodes[node_ids[i % len(node_ids)]]
                 r = Restaurant.objects.create(
                     name=data['name'],
                     cuisine=data['cuisine'],
                     rating=data['rating'],
-                    average_delivery_time=data['average_delivery_time']
+                    average_delivery_time=data['average_delivery_time'],
+                    location=assigned_node
                 )
                 for item in data['menu']:
                     MenuItem.objects.create(
@@ -62,11 +66,28 @@ def seed_database():
                         name=item['name'], 
                         price=item['price']
                     )
-        print(f"✅ Successfully saved {len(restaurants_data)} restaurants!")
+        print(f"[OK] Successfully saved {len(restaurants_data)} restaurants!")
     except FileNotFoundError:
-        print("❌ Error: Could not find 'food_data.json'!")
+        print("[ERROR] Could not find 'food_data.json'!")
 
-    print("✅ Database is fully seeded!")
+    print("Creating Users...")
+    # Assign users to customer-area nodes (nodes 5, 6, 7, 8, 9)
+    user_node_ids = [5, 6, 7, 8, 9]
+    users_data = [
+        {"name": "Ahmed Khan", "email": "ahmed.khan@example.com", "password": "pass123", "node": 5},
+        {"name": "Sara Ali", "email": "sara.ali@example.com", "password": "pass123", "node": 6},
+        {"name": "Bilal Hussain", "email": "bilal.hussain@example.com", "password": "pass123", "node": 7},
+        {"name": "Fatima Rizvi", "email": "fatima.rizvi@example.com", "password": "pass123", "node": 8},
+        {"name": "Usman Sheikh", "email": "usman.sheikh@example.com", "password": "pass123", "node": 9},
+    ]
+    for u in users_data:
+        User.objects.create(
+            name=u['name'], email=u['email'], password=u['password'],
+            location=created_nodes[u['node']]
+        )
+    print(f"[OK] Successfully created {len(users_data)} users!")
+
+    print("[OK] Database is fully seeded!")
 
 if __name__ == '__main__':
     seed_database()
