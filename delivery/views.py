@@ -1,85 +1,43 @@
-from rest_framework import generics
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.db import connection
-import requests
+from delivery_brain import calculate_shortest_path, get_restaurant_node
 
-from .models import MapNode, Restaurant,MenuItem, User
-from .serializers import MapNodeSerializer, RestaurantSerializer
+@api_view(['GET'])
+def get_delivery_route(request):
+    # 1. Grab the data sent by the frontend URL
+    restaurant_name = request.GET.get('restaurant')
+    customer_node = request.GET.get('customer_node')
+    traffic = request.GET.get('traffic', 'normal')
 
+    # 2. Check if the frontend forgot to send necessary data
+    if not restaurant_name or not customer_node:
+        return Response({"error": "Please provide both 'restaurant' and 'customer_node'."}, status=400)
 
-class MapNodeList(generics.ListCreateAPIView):
-    queryset = MapNode.objects.all()
-    serializer_class = MapNodeSerializer
-
-# View for your 25 Karachi Restaurants
-class RestaurantListView(generics.ListAPIView):
-    queryset = Restaurant.objects.all()
-    serializer_class = RestaurantSerializer
-
-# NEW VIEW (Your Backend/Database Order API)
-@api_view(['POST'])
-def create_order(request):
-    # 1. Grab the data sent by Mawavia's frontend
-    user_id = request.data.get('user_id')
-    restaurant_id = request.data.get('restaurant_id')
-    menu_item_id = request.data.get('menu_item_id')
-    quantity = request.data.get('quantity', 1)
-
-    # Basic safety check to ensure we have all the data
-    if not all([user_id, restaurant_id, menu_item_id]):
-        return Response({"error": "Missing required fields! Need user_id, restaurant_id, and menu_item_id."}, status=400)
-
-    # 2. Call your custom PostgreSQL Stored Procedure!
     try:
-        with connection.cursor() as cursor:
-            # This runs the raw SQL we injected in the migration
-            cursor.execute(
-                "CALL place_order(%s, %s, %s, %s);",
-                [user_id, restaurant_id, menu_item_id, quantity]
-            )
-    except Exception as e:
-        return Response({"error": f"Database error: {str(e)}"}, status=500)
+        customer_node = int(customer_node)
+    except ValueError:
+        return Response({"error": "'customer_node' must be a number."}, status=400)
 
-    # ---------------------------------------------------------
-    # 3. Trigger the n8n Webhook for the Email Automation
-    # ---------------------------------------------------------
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
-    
-    n8n_webhook_url = os.environ.get('N8N_WEBHOOK_URL', "https://sibyl-tetradynamous-griselda.ngrok-free.dev/webhook-test/order-placed")
-    
-    # NEW: Fetch the actual names from the database using the IDs!
-    # (Using 'pk' is a Django trick that automatically finds the primary key, even if it's custom named)
-    try:
-        user_obj = User.objects.get(pk=user_id)
-        rest_obj = Restaurant.objects.get(pk=restaurant_id)
-        item_obj = MenuItem.objects.get(pk=menu_item_id)
+    # 3. Use your AI Brain to find the starting node
+    start_node = get_restaurant_node(restaurant_name)
+    if not start_node:
+        return Response({"error": f"Restaurant '{restaurant_name}' not found or has no mapped location."}, status=404)
 
-        # Build a "Rich" payload so n8n has the actual text it needs
-        n8n_data = {
-            "customer_name": user_obj.name,
-            "customer_email": user_obj.email,
-            "restaurant_name": rest_obj.name,
-            "item_name": item_obj.name,
-            "quantity": quantity,
-            "total_price": float(item_obj.price * quantity) # Calculate total for the email!
-        }
-    except Exception as e:
-        print(f"Error fetching names for webhook: {e}")
-        # Fallback to IDs if something goes wrong
-        n8n_data = {
-            "user_id": user_id, "restaurant_id": restaurant_id, 
-            "menu_item_id": menu_item_id, "quantity": quantity
-        }
-    
-    try:
-        # Send the RICH data to n8n
-        requests.post(n8n_webhook_url, json=n8n_data, timeout=3)
-        print("Webhook fired to n8n successfully with names!")
-    except Exception as e:
-        print(f"n8n webhook failed: {e}")
+    # 4. Calculate the path
+    distance, path = calculate_shortest_path(start_node, customer_node, traffic)
 
-    # 4. Tell the frontend the order was a success!
-    return Response({"message": "Order placed successfully! Confirmation email triggered."}, status=201)
+    # 5. Format and return the JSON response
+    if path:
+        estimated_time = int(distance * 2)
+        return Response({
+            "status": "success",
+            "restaurant": restaurant_name,
+            "start_node": start_node,
+            "customer_node": customer_node,
+            "traffic_condition": traffic,
+            "route": path,
+            "distance_units": round(distance, 2),
+            "estimated_time_minutes": estimated_time
+        })
+    else:
+        return Response({"error": "No valid route found to the customer."}, status=404)
