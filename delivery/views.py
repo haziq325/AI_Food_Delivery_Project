@@ -24,20 +24,24 @@ def get_delivery_route(request):
         return Response({"error": f"Restaurant '{restaurant_name}' not found or has no mapped location."}, status=404)
 
     # 4. Calculate the path
-    distance, path = calculate_shortest_path(start_node, customer_node, traffic)
+    distance, path, final_traffic = calculate_shortest_path(start_node, customer_node, traffic)
 
     # 5. Format and return the JSON response
-    if path:
-        estimated_time = int(distance * 2)
+    # 4. Calculate the path (Now catching THREE variables!)
+    distance, path, final_traffic = calculate_shortest_path(start_node, customer_node, traffic)
+
+    # 5. Send the smart data back to the frontend
+    if path and distance is not None:
+        estimated_time = int(distance * 2) 
+        
         return Response({
-            "status": "success",
-            "restaurant": restaurant_name,
-            "start_node": start_node,
-            "customer_node": customer_node,
-            "traffic_condition": traffic,
             "route": path,
             "distance_units": round(distance, 2),
-            "estimated_time_minutes": estimated_time
+            "estimated_time_minutes": estimated_time,
+            "traffic_condition": final_traffic  # Tells the frontend if Rush Hour kicked in!
         })
     else:
-        return Response({"error": "No valid route found to the customer."}, status=404)
+        return Response({
+            "error": "Path blocked! No route to customer.",
+            "traffic_condition": final_traffic
+        }, status=400)
