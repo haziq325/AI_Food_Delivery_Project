@@ -1,10 +1,15 @@
 from django.contrib import admin
 from django.urls import path
-from delivery import views  # 🚨 Put this import here, inside urls.py!
+# Import from your APP name 'delivery'
+from delivery.views import MapNodeList, RestaurantListView 
+from delivery import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # Your Week 4 API Endpoint
-    path('api/get-route/', views.get_delivery_route, name='get_delivery_route'),
+    # The AI Lead's Map Nodes
+    path('api/nodes/', MapNodeList.as_view(), name='node-list'),
+    # Your 25 Karachi Restaurants
+    path('api/restaurants/', RestaurantListView.as_view(), name='restaurant-list'),
+
+    path('api/orders/', views.create_order, name='create-order'),
 ]
