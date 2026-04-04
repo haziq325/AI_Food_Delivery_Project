@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.db import connection
 import requests
 
+from delivery_brain import get_restaurant_node, calculate_shortest_path
 from .models import MapNode, Restaurant,MenuItem, User
 from .serializers import MapNodeSerializer, RestaurantSerializer
 
@@ -83,3 +84,50 @@ def create_order(request):
 
     # 4. Tell the frontend the order was a success!
     return Response({"message": "Order placed successfully! Confirmation email triggered."}, status=201)
+
+@api_view(['POST', 'GET'])
+def calculate_route(request):
+    # Support both GET and POST for flexibly taking inputs
+    data = request.data if request.method == 'POST' else request.query_params
+    
+    restaurant_name = data.get('restaurant_name')
+    customer_node = data.get('customer_node')
+    traffic_level = data.get('traffic', 'auto')  # Feature 2: Fall back to Auto
+    blocked_edges_param = data.get('blocked_edges', []) # Feature 3: Road closures
+
+    if not restaurant_name or not customer_node:
+        return Response({"error": "Missing required fields: restaurant_name and customer_node."}, status=400)
+
+    try:
+        customer_node = int(customer_node)
+    except ValueError:
+        return Response({"error": "customer_node must be a valid number."}, status=400)
+
+    start_node = get_restaurant_node(restaurant_name)
+    if not start_node:
+        return Response({"error": f"Could not find a valid location for restaurant '{restaurant_name}'."}, status=404)
+
+    # Format blocked edges if they exist. Expected format: [[1,2], [3,4]]
+    blocked_edges = []
+    if blocked_edges_param and isinstance(blocked_edges_param, list):
+        for edge in blocked_edges_param:
+            if isinstance(edge, list) and len(edge) == 2:
+                blocked_edges.append(tuple(edge))
+
+    distance, path = calculate_shortest_path(start_node, customer_node, traffic_level, blocked_edges=blocked_edges)
+
+    if path:
+        # Based on delivery_brain.py simulation logic: 1 unit distance = 2 minutes
+        estimated_time = int(distance * 2) 
+        
+        return Response({
+            "status": "success",
+            "restaurant_name": restaurant_name,
+            "customer_node": customer_node,
+            "traffic": traffic_level,
+            "route": path,
+            "distance_units": round(distance, 2),
+            "estimated_delivery_time_minutes": estimated_time
+        }, status=200)
+    else:
+        return Response({"error": "Path blocked! No route to customer."}, status=404)

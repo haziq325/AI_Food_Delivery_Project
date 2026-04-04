@@ -2,6 +2,11 @@ import os
 import sys
 import django
 import heapq
+import datetime
+import pytz
+import time
+import math
+import joblib
 
 # --- PATH & DJANGO SETUP ---
 sys.path.append(os.getcwd())
@@ -31,11 +36,31 @@ def get_restaurant_node(restaurant_name):
         return None
 
 # ==========================================
-# 2. THE AI BRAIN: DIJKSTRA + TRAFFIC
+# 2. THE AI BRAIN: DIJKSTRA + TRAFFIC AUTOMATION
 # ==========================================
-def calculate_shortest_path(start_id, end_id, traffic_level="normal"):
-    """Calculates the fastest route using Dijkstra's Algorithm, factoring in traffic."""
+def get_current_traffic_condition():
+    """Checks the current time in Pakistan. If it is 5PM-8PM, returns 'heavy/jammed'."""
+    try:
+        pk_tz = pytz.timezone('Asia/Karachi')
+        now = datetime.datetime.now(pk_tz).time()
+        
+        # 5:00 PM (17:00) to 8:00 PM (20:00)
+        rush_hour_start = datetime.time(17, 0)
+        rush_hour_end = datetime.time(20, 0)
+        
+        if rush_hour_start <= now <= rush_hour_end:
+            print("🕒 Alert: Peak Rush Hour Detected in Karachi! Adapting routes.")
+            return "heavy"
+    except Exception as e:
+        print(f"Error checking time: {e}")
+    return "normal"
+
+def calculate_shortest_path(start_id, end_id, traffic_level="auto", blocked_edges=None):
+    """Calculates the fastest route using Dijkstra's Algorithm, factoring in traffic and closures."""
     
+    if traffic_level == "auto":
+        traffic_level = get_current_traffic_condition()
+
     # Traffic multipliers (e.g., heavy traffic makes a 5km road feel like 7.5km)
     traffic_multipliers = {
         "light": 0.8,
@@ -44,7 +69,6 @@ def calculate_shortest_path(start_id, end_id, traffic_level="normal"):
         "jammed": 2.5
     }
     multiplier = traffic_multipliers.get(traffic_level.lower(), 1.0)
-    print(f"🚦 Traffic Conditions: {traffic_level.upper()} (Distance Multiplier: {multiplier}x)")
 
     # 1. Build the graph dynamically from the Database
     graph = {}
@@ -53,13 +77,15 @@ def calculate_shortest_path(start_id, end_id, traffic_level="normal"):
     for edge in edges:
         u = edge.from_node.node_id
         v = edge.to_node.node_id
-        # Apply traffic delay to the physical distance
+
+        # ROAD CLOSURE CHECK (Task 3)
+        if blocked_edges and ((u, v) in blocked_edges or (v, u) in blocked_edges):
+            continue
+
         weight = float(edge.distance) * multiplier 
-        
         if u not in graph: graph[u] = {}
         if v not in graph: graph[v] = {}
         
-        # Assuming our Karachi roads are two-way streets
         graph[u][v] = weight
         graph[v][u] = weight 
 
@@ -95,10 +121,97 @@ def calculate_shortest_path(start_id, end_id, traffic_level="normal"):
 
     return float('inf'), [] # No path found
 
+def calculate_shortest_path_astar(start_id, end_id, traffic_level="auto", blocked_edges=None):
+    """Calculates the fastest route using the A* Algorithm."""
+    if traffic_level == "auto":
+        traffic_level = get_current_traffic_condition()
+
+    traffic_multipliers = { "light": 0.8, "normal": 1.0, "heavy": 1.5, "jammed": 2.5 }
+    multiplier = traffic_multipliers.get(traffic_level.lower(), 1.0)
+    
+    # Pre-fetch nodes for heuristic calculation
+    nodes = {n.node_id: n for n in MapNode.objects.all()}
+    if start_id not in nodes or end_id not in nodes:
+         return float('inf'), []
+
+    target_node = nodes[end_id]
+
+    def heuristic(node_id):
+        n = nodes[node_id]
+        # Euclidean distance heuristic
+        return math.sqrt((n.x_coordinate - target_node.x_coordinate)**2 + (n.y_coordinate - target_node.y_coordinate)**2)
+
+    graph = {}
+    edges = MapEdge.objects.all()
+    for edge in edges:
+        u = edge.from_node.node_id
+        v = edge.to_node.node_id
+        if blocked_edges and ((u, v) in blocked_edges or (v, u) in blocked_edges):
+            continue
+        weight = float(edge.distance) * multiplier 
+        if u not in graph: graph[u] = {}
+        if v not in graph: graph[v] = {}
+        graph[u][v] = weight
+        graph[v][u] = weight 
+
+    # Queue format: (f_score, current_cost, current_node, path)
+    queue = [(heuristic(start_id), 0, start_id, [])]
+    seen = set()
+    min_distances = {start_id: 0}
+
+    while queue:
+        f_score, cost, current_node, path = heapq.heappop(queue)
+
+        if current_node in seen:
+            continue
+
+        path = path + [current_node]
+        seen.add(current_node)
+
+        if current_node == end_id:
+            return cost, path
+
+        for neighbor, weight in graph.get(current_node, {}).items():
+            if neighbor in seen:
+                continue
+                
+            next_cost = cost + weight
+            prev_cost = min_distances.get(neighbor, float('inf'))
+            
+            if next_cost < prev_cost:
+                min_distances[neighbor] = next_cost
+                f = next_cost + heuristic(neighbor)
+                heapq.heappush(queue, (f, next_cost, neighbor, path))
+
+    return float('inf'), []
+
+def compare_algorithms(start_id, end_id, traffic_level="auto", blocked_edges=None):
+    """Compares the runtime and path length of Dijkstra and A*."""
+    print("\n" + "="*40)
+    print(f"🏎️ COMPARING ALGORITHMS (Node {start_id} -> Node {end_id})")
+    print("="*40)
+    
+    # 1. Dijkstra
+    start_time = time.perf_counter()
+    d_cost, d_path = calculate_shortest_path(start_id, end_id, traffic_level, blocked_edges)
+    d_time = (time.perf_counter() - start_time) * 1000 # ms
+    
+    # 2. A*
+    start_time = time.perf_counter()
+    a_cost, a_path = calculate_shortest_path_astar(start_id, end_id, traffic_level, blocked_edges)
+    a_time = (time.perf_counter() - start_time) * 1000 # ms
+    
+    print(f"Dijkstra Cost: {d_cost:.2f} | Execution Time: {d_time:.4f} ms")
+    print(f"A*       Cost: {a_cost:.2f} | Execution Time: {a_time:.4f} ms")
+    if d_path == a_path:
+        print("✅ Both algorithms found the exact same optimal path!")
+    else:
+        print("⚠️ Algorithms found different paths of similar cost.")
+
 # ==========================================
 # 3. RUN THE SIMULATION
 # ==========================================
-def simulate_delivery(restaurant_name, customer_node, traffic="normal"):
+def simulate_delivery(restaurant_name, customer_node, traffic="auto", blocked_edges=None):
     print(f"\n{'-'*40}")
     print(f"🛵 NEW ORDER: Pick up from '{restaurant_name.upper()}'")
     print(f"{'-'*40}")
@@ -110,20 +223,49 @@ def simulate_delivery(restaurant_name, customer_node, traffic="normal"):
     print(f"📍 LOCATION: Found at Node {start_node}.")
     print(f"🎯 DROPOFF: Customer is waiting at Node {customer_node}.")
 
-    distance, path = calculate_shortest_path(start_node, customer_node, traffic)
+    # Use A* by default for simulations!
+    distance, path = calculate_shortest_path_astar(start_node, customer_node, traffic, blocked_edges)
 
     if path:
-        # Time estimation logic: Let's assume 1 unit of adjusted distance takes 2 minutes to drive
-        estimated_time = int(distance * 2) 
+        estimated_time = 0
+        try:
+            # ML Model Prediction
+            model = joblib.load('eta_model.pkl')
+            
+            # Re-resolve the actual multiplier to feed into the ML model
+            traffic_level_mapped = traffic if traffic != "auto" else get_current_traffic_condition()
+            multipliers = { "light": 0.8, "normal": 1.0, "heavy": 1.5, "jammed": 2.5 }
+            t_mult = multipliers.get(traffic_level_mapped.lower(), 1.0)
+            
+            # Assume a random order size for the simulation
+            import random
+            order_size_sim = random.randint(1, 5)
+            
+            # Predict
+            import pandas as pd
+            features_df = pd.DataFrame([[distance, order_size_sim, t_mult]], columns=['distance', 'order_size', 'traffic_multiplier'])
+            pred_time = model.predict(features_df)[0]
+            estimated_time = int(pred_time)
+            model_info = f"🤖 ML Predicted (Size: {order_size_sim} items)"
+        except Exception as e:
+            # Fallback
+            estimated_time = int(distance * 2) 
+            model_info = "📏 Hardcoded Estimate"
         
-        print(f"\n✅ ROUTE CALCULATED!")
+        print(f"\n✅ ROUTE CALCULATED (Using A*)!")
         print(f"🗺️  Path: {' -> '.join(map(str, path))}")
         print(f"📏 Distance (adjusted for traffic): {distance:.2f} units")
-        print(f"⏱️  Estimated Delivery Time: {estimated_time} minutes")
+        print(f"⏱️  Estimated Delivery Time: {estimated_time} minutes ({model_info})")
+        
+        # Also run the comparison behind the scenes
+        compare_algorithms(start_node, customer_node, traffic, blocked_edges)
     else:
         print("❌ Error: Path blocked! No route to customer.")
 
 if __name__ == '__main__':
-    # Let's test two different orders with different traffic conditions!
-    simulate_delivery("Burger O'Clock", customer_node=14, traffic="normal")
-    simulate_delivery("Javed Nihari", customer_node=4, traffic="jammed")
+    # Test 1: Let the system auto-check the Pakistan time for rush hour traffic!
+    simulate_delivery("Burger O'Clock", customer_node=14, traffic="auto")
+
+    # Test 2: The worst-case scenario! Road is completely blocked between nodes 1 and 2
+    print("\n⚠️ --- INITIATING ROAD CLOSURE SIMULATION --- ⚠️")
+    simulate_delivery("Javed Nihari", customer_node=8, traffic="normal", blocked_edges=[(1, 2), (2, 1), (14, 3), (3, 14)])

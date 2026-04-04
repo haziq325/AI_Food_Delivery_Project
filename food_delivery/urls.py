@@ -12,4 +12,7 @@ urlpatterns = [
     path('api/restaurants/', RestaurantListView.as_view(), name='restaurant-list'),
 
     path('api/orders/', views.create_order, name='create-order'),
+    
+    # New Route Calculation API linking delivery_brain
+    path('api/calculate-route/', views.calculate_route, name='calculate-route'),
 ]
