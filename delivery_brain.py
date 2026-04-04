@@ -1,9 +1,7 @@
 import os
 import sys
 import django
-import networkx as nx
-from datetime import datetime
-import pytz
+import heapq
 
 # --- PATH & DJANGO SETUP ---
 sys.path.append(os.getcwd())
@@ -11,34 +9,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'food_delivery.settings')
 django.setup()
 
 from delivery.models import Restaurant, MapNode, MapEdge
-
-# --- 🚦 WEEK 5: TRAFFIC CONSTANTS ---
-TRAFFIC_MULTIPLIERS = {
-    'light': 0.8,    # 20% faster than normal
-    'normal': 1.0,   # Standard speed
-    'moderate': 1.5, # Takes 50% longer
-    'heavy': 2.5,    # Takes 150% longer (Gridlock)
-    'jammed': 3.0    # Adding this to support your test at the bottom!
-}
-
-# ==========================================
-# 0. BUILD THE GRAPH FROM THE DATABASE
-# ==========================================
-# FIX: We need to actually build 'karachi_graph' before the AI can use it!
-# ==========================================
-# 0. BUILD THE GRAPH FROM THE DATABASE
-# ==========================================
-def build_city_graph():
-    G = nx.Graph()
-    # Pull all edges from your database and add them to the NetworkX graph
-    for edge in MapEdge.objects.all():
-        # UPDATED: Using 'from_node' and 'to_node' to match your models.py
-        G.add_edge(edge.from_node.node_id, edge.to_node.node_id, weight=edge.distance)
-    return G
-
-# Initialize the graph
-karachi_graph = build_city_graph()
-
 
 # ==========================================
 # 1. SEARCH CAPABILITY
@@ -60,59 +30,70 @@ def get_restaurant_node(restaurant_name):
         print(f"⚠️ Found multiple restaurants matching '{restaurant_name}'. Be more specific.")
         return None
 
-
 # ==========================================
 # 2. THE AI BRAIN: DIJKSTRA + TRAFFIC
 # ==========================================
-def get_realtime_traffic(requested_traffic):
-    """
-    TASK 2: RUSH HOUR LOGIC
-    Checks the current time in Pakistan. If it is rush hour, it overrides 
-    the requested traffic to 'heavy'.
-    """
-    tz = pytz.timezone('Asia/Karachi')
-    karachi_time = datetime.now(tz)
+def calculate_shortest_path(start_id, end_id, traffic_level="normal"):
+    """Calculates the fastest route using Dijkstra's Algorithm, factoring in traffic."""
     
-    # Karachi Rush Hour: 5:00 PM (17:00) to 8:00 PM (20:00)
-    if 17 <= karachi_time.hour < 20:
-        return 'heavy' 
-    
-    return requested_traffic
+    # Traffic multipliers (e.g., heavy traffic makes a 5km road feel like 7.5km)
+    traffic_multipliers = {
+        "light": 0.8,
+        "normal": 1.0,
+        "heavy": 1.5,
+        "jammed": 2.5
+    }
+    multiplier = traffic_multipliers.get(traffic_level.lower(), 1.0)
+    print(f"🚦 Traffic Conditions: {traffic_level.upper()} (Distance Multiplier: {multiplier}x)")
 
-def calculate_shortest_path(start_node, end_node, traffic_condition='normal', closed_roads=None):
-    """
-    Calculates the best route while handling dynamic traffic and road closures.
-    closed_roads should be a list of tuples, e.g., [(5, 8), (12, 14)]
-    """
-    # 1. Determine actual traffic based on the clock
-    actual_traffic = get_realtime_traffic(traffic_condition)
-    multiplier = TRAFFIC_MULTIPLIERS.get(actual_traffic.lower(), 1.0)
+    # 1. Build the graph dynamically from the Database
+    graph = {}
+    edges = MapEdge.objects.all()
     
-    # 2. Create a temporary graph to avoid permanently changing the main map
-    dynamic_graph = karachi_graph.copy()
-    
-    # 3. TASK 3: ROAD CLOSURES
-    if closed_roads:
-        for u, v in closed_roads:
-            if dynamic_graph.has_edge(u, v):
-                dynamic_graph.remove_edge(u, v)
+    for edge in edges:
+        u = edge.from_node.node_id
+        v = edge.to_node.node_id
+        # Apply traffic delay to the physical distance
+        weight = float(edge.distance) * multiplier 
+        
+        if u not in graph: graph[u] = {}
+        if v not in graph: graph[v] = {}
+        
+        # Assuming our Karachi roads are two-way streets
+        graph[u][v] = weight
+        graph[v][u] = weight 
+
+    # 2. Run Dijkstra's Algorithm
+    queue = [(0, start_id, [])] # (current_cost, current_node, path_history)
+    seen = set()
+    min_distances = {start_id: 0}
+
+    while queue:
+        (cost, current_node, path) = heapq.heappop(queue)
+
+        if current_node in seen:
+            continue
+
+        path = path + [current_node]
+        seen.add(current_node)
+
+        # If we reached the customer, return the final cost and path
+        if current_node == end_id:
+            return cost, path
+
+        # Check neighbors
+        for neighbor, weight in graph.get(current_node, {}).items():
+            if neighbor in seen:
+                continue
                 
-    # 4. TASK 1: APPLY TRAFFIC MULTIPLIER
-    for u, v, data in dynamic_graph.edges(data=True):
-        base_distance = data.get('weight', 1)
-        # Make the road "heavier" based on traffic
-        dynamic_graph[u][v]['weight'] = base_distance * multiplier
-        
-    # 5. RUN DIJKSTRA
-    try:
-        path = nx.dijkstra_path(dynamic_graph, source=start_node, target=end_node, weight='weight')
-        total_distance = nx.dijkstra_path_length(dynamic_graph, source=start_node, target=end_node, weight='weight')
-        
-        return total_distance, path, actual_traffic
-        
-    except nx.NetworkXNoPath:
-        return None, None, actual_traffic
+            prev_cost = min_distances.get(neighbor, float('inf'))
+            next_cost = cost + weight
+            
+            if next_cost < prev_cost:
+                min_distances[neighbor] = next_cost
+                heapq.heappush(queue, (next_cost, neighbor, path))
 
+    return float('inf'), [] # No path found
 
 # ==========================================
 # 3. RUN THE SIMULATION
@@ -129,14 +110,13 @@ def simulate_delivery(restaurant_name, customer_node, traffic="normal"):
     print(f"📍 LOCATION: Found at Node {start_node}.")
     print(f"🎯 DROPOFF: Customer is waiting at Node {customer_node}.")
 
-    # FIX: We now catch THREE variables from the function instead of two!
-    distance, path, final_traffic = calculate_shortest_path(start_node, customer_node, traffic)
+    distance, path = calculate_shortest_path(start_node, customer_node, traffic)
 
-    if path and distance:
+    if path:
+        # Time estimation logic: Let's assume 1 unit of adjusted distance takes 2 minutes to drive
         estimated_time = int(distance * 2) 
         
         print(f"\n✅ ROUTE CALCULATED!")
-        print(f"🚦 Traffic Conditions: {final_traffic.upper()}")
         print(f"🗺️  Path: {' -> '.join(map(str, path))}")
         print(f"📏 Distance (adjusted for traffic): {distance:.2f} units")
         print(f"⏱️  Estimated Delivery Time: {estimated_time} minutes")
@@ -144,6 +124,6 @@ def simulate_delivery(restaurant_name, customer_node, traffic="normal"):
         print("❌ Error: Path blocked! No route to customer.")
 
 if __name__ == '__main__':
-    # Test cases
+    # Let's test two different orders with different traffic conditions!
     simulate_delivery("Burger O'Clock", customer_node=14, traffic="normal")
     simulate_delivery("Javed Nihari", customer_node=4, traffic="jammed")
