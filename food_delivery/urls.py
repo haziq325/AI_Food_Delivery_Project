@@ -15,7 +15,4 @@ urlpatterns = [
     
     # New Route Calculation API linking delivery_brain
     path('api/calculate-route/', views.calculate_route, name='calculate-route'),
-    
-    # Content-based Recommendations API
-    path('api/recommendations/<int:user_id>/', views.get_recommendations, name='get-recommendations'),
 ]

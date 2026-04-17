@@ -131,15 +131,3 @@ def calculate_route(request):
         }, status=200)
     else:
         return Response({"error": "Path blocked! No route to customer."}, status=404)
-
-from delivery.recommendations import get_content_based_recommendations
-
-@api_view(['GET'])
-def get_recommendations(request, user_id):
-    try:
-        user_id = int(user_id)
-        recommended_restaurants = get_content_based_recommendations(user_id)
-        serializer = RestaurantSerializer(recommended_restaurants, many=True)
-        return Response({"status": "success", "recommendations": serializer.data}, status=200)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
