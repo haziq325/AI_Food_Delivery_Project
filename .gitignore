@@ -211,3 +211,13 @@ __marimo__/
 .env
 food_delivery/settings.py
 
+# Frontend Dependencies & Builds
+logistics-frontend/node_modules/
+logistics-frontend/.next/
+logistics-frontend/out/
+logistics-frontend/build/
+logistics-frontend/.env*
+logistics-frontend/npm-debug.log*
+logistics-frontend/yarn-debug.log*
+logistics-frontend/yarn-error.log*
+

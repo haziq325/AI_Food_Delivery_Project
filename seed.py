@@ -72,15 +72,15 @@ def seed_database_from_json():
                     name=item['name'],
                     price=item['price']
                 )
-        print(f"✅ Successfully saved authentic Karachi restaurants to your database!")
+        print("Successfully saved authentic Karachi restaurants to your database!")
     except FileNotFoundError:
-        print("❌ Error: Could not find 'food_data.json'. Make sure it is saved in the same folder as seed.py!")
+        print("Error: Could not find 'food_data.json'. Make sure it is saved in the same folder as seed.py!")
 
     # --- 3. SEED A TEST USER ---
     print("Creating a Test User...")
     User.objects.create(name="Test User", email="test@foodapp.com", password="password123")
     
-    print("✅ Database is fully seeded and ready for your AI algorithms!")
+    print("Database is fully seeded and ready for your AI algorithms!")
 
 if __name__ == '__main__':
     seed_database_from_json()

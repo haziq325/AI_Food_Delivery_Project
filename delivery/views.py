@@ -4,19 +4,33 @@ from rest_framework.response import Response
 from django.db import connection
 import requests
 
-from delivery_brain import get_restaurant_node, calculate_shortest_path
-from .models import MapNode, Restaurant,MenuItem, User
-from .serializers import MapNodeSerializer, RestaurantSerializer
+from delivery_brain import get_restaurant_node, calculate_shortest_path, calculate_shortest_path_astar
+from .models import MapNode, MapEdge, Restaurant, MenuItem, User, Order
+from .serializers import MapNodeSerializer, MapEdgeSerializer, RestaurantSerializer, MenuItemSerializer
 
 
 class MapNodeList(generics.ListCreateAPIView):
     queryset = MapNode.objects.all()
     serializer_class = MapNodeSerializer
 
+class MapEdgeList(generics.ListAPIView):
+    queryset = MapEdge.objects.all()
+    serializer_class = MapEdgeSerializer
+
 # View for your 25 Karachi Restaurants
 class RestaurantListView(generics.ListAPIView):
     queryset = Restaurant.objects.all()
     serializer_class = RestaurantSerializer
+
+class MenuItemListView(generics.ListAPIView):
+    serializer_class = MenuItemSerializer
+    
+    def get_queryset(self):
+        queryset = MenuItem.objects.all()
+        restaurant_id = self.request.query_params.get('restaurant')
+        if restaurant_id:
+            queryset = queryset.filter(restaurant_id=restaurant_id)
+        return queryset
 
 # NEW VIEW (Your Backend/Database Order API)
 @api_view(['POST'])
@@ -114,7 +128,14 @@ def calculate_route(request):
             if isinstance(edge, list) and len(edge) == 2:
                 blocked_edges.append(tuple(edge))
 
-    distance, path = calculate_shortest_path(start_node, customer_node, traffic_level, blocked_edges=blocked_edges)
+    algorithm = data.get('algorithm', 'dijkstra').lower()
+    
+    from delivery_brain import calculate_shortest_path_astar
+    
+    if algorithm == 'astar':
+        distance, path = calculate_shortest_path_astar(start_node, customer_node, traffic_level, blocked_edges=blocked_edges)
+    else:
+        distance, path = calculate_shortest_path(start_node, customer_node, traffic_level, blocked_edges=blocked_edges)
 
     if path:
         # Based on delivery_brain.py simulation logic: 1 unit distance = 2 minutes
@@ -141,5 +162,61 @@ def get_recommendations(request, user_id):
         recommended_restaurants = get_content_based_recommendations(user_id)
         serializer = RestaurantSerializer(recommended_restaurants, many=True)
         return Response({"status": "success", "recommendations": serializer.data}, status=200)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def place_order_with_path(request):
+    """
+    Relational Order Flow:
+    1. Authenticates against Django User model (user_id).
+    2. Uses delivery_brain logic (A*) to generate a path from Restaurant to User node.
+    3. Saves result into PostgreSQL Order table.
+    """
+    user_id = request.data.get('user_id')
+    restaurant_id = request.data.get('restaurant_id')
+    
+    if not user_id or not restaurant_id:
+        return Response({"error": "Missing user_id or restaurant_id"}, status=400)
+    
+    try:
+        user = User.objects.get(pk=user_id)
+        restaurant = Restaurant.objects.get(pk=restaurant_id)
+        
+        if not user.location or not restaurant.location_node:
+            return Response({"error": "User or Restaurant location node not defined"}, status=400)
+            
+        # Generate the path using existing A* logic
+        distance, path_nodes = calculate_shortest_path_astar(
+            restaurant.location_node.node_id, 
+            user.location.node_id, 
+            traffic_level='auto'
+        )
+        
+        if not path_nodes:
+             return Response({"error": "No valid path found between nodes"}, status=404)
+             
+        # Create the order
+        order = Order.objects.create(
+            user=user,
+            restaurant=restaurant,
+            delivery_path=",".join(map(str, path_nodes)),
+            status='Pending'
+        )
+        
+        return Response({
+            "status": "success",
+            "order_id": order.order_id,
+            "path": path_nodes,
+            "distance": round(distance, 2),
+            "estimated_time": int(distance * 2), # 2 mins per unit
+            "customer_location": {"x": user.location.x_coordinate, "y": user.location.y_coordinate},
+            "restaurant_location": {"x": restaurant.location_node.x_coordinate, "y": restaurant.location_node.y_coordinate}
+        }, status=201)
+        
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=404)
+    except Restaurant.DoesNotExist:
+        return Response({"error": "Restaurant not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)

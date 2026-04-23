@@ -71,8 +71,9 @@ def calculate_shortest_path(start_id, end_id, traffic_level="auto", blocked_edge
     }
     multiplier = traffic_multipliers.get(traffic_level.lower(), 1.0)
 
+    import networkx as nx
     # 1. Build the graph dynamically from the Database
-    graph = {}
+    graph = nx.Graph()
     edges = MapEdge.objects.all()
     
     for edge in edges:
@@ -84,43 +85,17 @@ def calculate_shortest_path(start_id, end_id, traffic_level="auto", blocked_edge
             continue
 
         weight = float(edge.distance) * multiplier 
-        if u not in graph: graph[u] = {}
-        if v not in graph: graph[v] = {}
-        
-        graph[u][v] = weight
-        graph[v][u] = weight 
+        graph.add_edge(u, v, weight=weight)
 
-    # 2. Run Dijkstra's Algorithm
-    queue = [(0, start_id, [])] # (current_cost, current_node, path_history)
-    seen = set()
-    min_distances = {start_id: 0}
-
-    while queue:
-        (cost, current_node, path) = heapq.heappop(queue)
-
-        if current_node in seen:
-            continue
-
-        path = path + [current_node]
-        seen.add(current_node)
-
-        # If we reached the customer, return the final cost and path
-        if current_node == end_id:
-            return cost, path
-
-        # Check neighbors
-        for neighbor, weight in graph.get(current_node, {}).items():
-            if neighbor in seen:
-                continue
-                
-            prev_cost = min_distances.get(neighbor, float('inf'))
-            next_cost = cost + weight
-            
-            if next_cost < prev_cost:
-                min_distances[neighbor] = next_cost
-                heapq.heappush(queue, (next_cost, neighbor, path))
-
-    return float('inf'), [] # No path found
+    # 2. Run Dijkstra's Algorithm via NetworkX
+    try:
+        path = nx.shortest_path(graph, source=start_id, target=end_id, weight='weight', method='dijkstra')
+        cost = nx.shortest_path_length(graph, source=start_id, target=end_id, weight='weight', method='dijkstra')
+        return cost, path
+    except nx.NetworkXNoPath:
+        return float('inf'), []
+    except nx.NodeNotFound:
+        return float('inf'), []
 
 def calculate_shortest_path_astar(start_id, end_id, traffic_level="auto", blocked_edges=None):
     """Calculates the fastest route using the A* Algorithm."""
@@ -135,56 +110,33 @@ def calculate_shortest_path_astar(start_id, end_id, traffic_level="auto", blocke
     if start_id not in nodes or end_id not in nodes:
          return float('inf'), []
 
-    target_node = nodes[end_id]
-
-    def heuristic(node_id):
-        n = nodes[node_id]
+    def heuristic(u, v):
+        n1 = nodes.get(u)
+        n2 = nodes.get(v)
+        if not n1 or not n2: return 0
         # Euclidean distance heuristic
-        return math.sqrt((n.x_coordinate - target_node.x_coordinate)**2 + (n.y_coordinate - target_node.y_coordinate)**2)
+        return math.sqrt((n1.x_coordinate - n2.x_coordinate)**2 + (n1.y_coordinate - n2.y_coordinate)**2)
 
-    graph = {}
+    import networkx as nx
+    graph = nx.Graph()
     edges = MapEdge.objects.all()
+    
     for edge in edges:
         u = edge.from_node.node_id
         v = edge.to_node.node_id
         if blocked_edges and ((u, v) in blocked_edges or (v, u) in blocked_edges):
             continue
         weight = float(edge.distance) * multiplier 
-        if u not in graph: graph[u] = {}
-        if v not in graph: graph[v] = {}
-        graph[u][v] = weight
-        graph[v][u] = weight 
+        graph.add_edge(u, v, weight=weight)
 
-    # Queue format: (f_score, current_cost, current_node, path)
-    queue = [(heuristic(start_id), 0, start_id, [])]
-    seen = set()
-    min_distances = {start_id: 0}
-
-    while queue:
-        f_score, cost, current_node, path = heapq.heappop(queue)
-
-        if current_node in seen:
-            continue
-
-        path = path + [current_node]
-        seen.add(current_node)
-
-        if current_node == end_id:
-            return cost, path
-
-        for neighbor, weight in graph.get(current_node, {}).items():
-            if neighbor in seen:
-                continue
-                
-            next_cost = cost + weight
-            prev_cost = min_distances.get(neighbor, float('inf'))
-            
-            if next_cost < prev_cost:
-                min_distances[neighbor] = next_cost
-                f = next_cost + heuristic(neighbor)
-                heapq.heappush(queue, (f, next_cost, neighbor, path))
-
-    return float('inf'), []
+    try:
+        path = nx.astar_path(graph, source=start_id, target=end_id, heuristic=heuristic, weight='weight')
+        cost = nx.astar_path_length(graph, source=start_id, target=end_id, heuristic=heuristic, weight='weight')
+        return cost, path
+    except nx.NetworkXNoPath:
+        return float('inf'), []
+    except nx.NodeNotFound:
+        return float('inf'), []
 
 def compare_algorithms(start_id, end_id, traffic_level="auto", blocked_edges=None):
     """Compares the runtime and path length of Dijkstra and A*."""
