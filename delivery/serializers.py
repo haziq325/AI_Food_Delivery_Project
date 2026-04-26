@@ -31,12 +31,15 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    menu_item_name = serializers.CharField(source='menu_item.name', read_only=True)
     class Meta:
         model = OrderItem
         fields = '__all__'
 
 class OrderSerializer(serializers.ModelSerializer):
     order_items = OrderItemSerializer(many=True, read_only=True, source='orderitem_set')
+    user_name = serializers.CharField(source='user.name', read_only=True)
+    restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
 
     class Meta:
         model = Order

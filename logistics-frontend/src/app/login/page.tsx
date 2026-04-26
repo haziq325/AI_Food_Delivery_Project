@@ -35,24 +35,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 command-center-bg">
+    <div className="min-h-screen text-secondary flex flex-col items-center justify-center p-6 command-center-bg">
       <div className="mb-12 flex flex-col items-center">
-        <div className="w-16 h-16 bg-primary rounded-md flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(0,82,255,0.4)]">
+        <div className="w-16 h-16 bg-primary rounded-md flex items-center justify-center mb-4 shadow-sm">
           <Shield className="text-white h-8 w-8" />
         </div>
-        <h1 className="text-2xl font-bold text-white tracking-widest uppercase mb-1">Relational Logistics AI</h1>
-        <p className="text-slate-500 text-xs font-mono tracking-wider uppercase">Command Center Terminal v4.0.2</p>
+        <h1 className="text-2xl font-bold text-secondary tracking-widest uppercase mb-1">Relational Logistics AI</h1>
+        <p className="text-secondary/70 text-xs font-mono tracking-wider uppercase">Command Center Terminal v4.0.2</p>
       </div>
 
-      <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-md p-8 shadow-2xl relative overflow-hidden">
+      <div className="w-full max-w-md bg-white/60 backdrop-blur-xl border border-secondary/10 rounded-xl p-8 shadow-sm relative overflow-hidden">
         {/* Network Secure Status */}
         <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center">
-            <div className="h-2 w-2 bg-success rounded-full animate-pulse mr-2" />
-            <span className="text-[10px] font-bold text-success uppercase tracking-wider">Network Secure</span>
+            <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse mr-2" />
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Network Secure</span>
           </div>
-          <div className="flex items-center text-[10px] font-mono text-slate-500">
+          <div className="flex items-center text-[10px] font-mono text-secondary/70">
             <Globe className="h-3 w-3 mr-1" />
             192.168.0.1
           </div>
@@ -60,30 +60,30 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Employee Identity (Email)</label>
+            <label className="block text-[10px] font-bold text-secondary/70 uppercase mb-2 tracking-widest">Employee Identity (Email)</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary/50" />
               <input 
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="identity@network.ai"
-                className="w-full bg-slate-950/50 border border-white/5 rounded-md py-3 pl-10 pr-4 text-sm text-white placeholder:text-slate-700 focus:border-primary outline-none transition-all font-mono"
+                className="w-full bg-white/40 border border-secondary/10 rounded-md py-3 pl-10 pr-4 text-sm text-secondary placeholder:text-secondary/50 focus:border-primary outline-none transition-all font-mono"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Access Protocol (Password)</label>
+            <label className="block text-[10px] font-bold text-secondary/70 uppercase mb-2 tracking-widest">Access Protocol (Password)</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary/50" />
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full bg-slate-950/50 border border-white/5 rounded-md py-3 pl-10 pr-4 text-sm text-white focus:border-primary outline-none transition-all"
+                className="w-full bg-white/40 border border-secondary/10 rounded-md py-3 pl-10 pr-4 text-sm text-secondary focus:border-primary outline-none transition-all"
                 required
               />
             </div>
@@ -105,14 +105,14 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center text-[10px] font-mono text-slate-600">
-          <span className="hover:text-slate-400 cursor-pointer">Recover Key</span>
-          <span className="hover:text-slate-400 cursor-pointer">Protocol: Auth/V2</span>
+        <div className="mt-8 pt-6 border-t border-secondary/10 flex justify-between items-center text-[10px] font-mono text-secondary/60">
+          <span className="hover:text-primary cursor-pointer">Recover Key</span>
+          <span className="hover:text-primary cursor-pointer">Protocol: Auth/V2</span>
         </div>
       </div>
 
       <div className="mt-12 text-center">
-        <p className="text-[10px] font-bold text-slate-700 uppercase tracking-[0.3em]">Authorized Personnel Only</p>
+        <p className="text-[10px] font-bold text-secondary/50 uppercase tracking-[0.3em]">Authorized Personnel Only</p>
       </div>
     </div>
   );

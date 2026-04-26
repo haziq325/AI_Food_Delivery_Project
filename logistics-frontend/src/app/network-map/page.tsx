@@ -129,8 +129,9 @@ function NetworkMapContent() {
       if (!restaurant) return;
 
       const result = await placeOrder({
-        user_id: 4, // Lead Analyst ID (from DB)
-        restaurant_id: restaurant.restaurant_id
+        user_id: 1, // Fallback Lead Analyst ID, backend handles it
+        restaurant_id: restaurant.restaurant_id,
+        destination_node: destination // Pass the specific node from the UI
       });
 
       if (result.status === "success") {
@@ -155,29 +156,44 @@ function NetworkMapContent() {
     }
   };
 
+  const calculatePhysicalDistance = (path: number[]) => {
+    if (!path || path.length < 2) return 0;
+    return path.reduce((acc, nodeId, index) => {
+      if (index === 0) return acc;
+      const prevNode = path[index - 1];
+      const edge = edges.find(e => 
+        (e.from_node === prevNode && e.to_node === nodeId) || 
+        (e.from_node === nodeId && e.to_node === prevNode)
+      );
+      return acc + (edge ? parseFloat(edge.distance.toString()) : 0);
+    }, 0);
+  };
+
+  const activePhysicalDistance = calculatePhysicalDistance(activePath);
+
   return (
     <AppLayout>
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">Relational Logistics Map</h1>
-          <p className="text-slate-500 font-medium">Visualizing Dijkstra vs. A* trajectory optimization.</p>
+          <h1 className="text-3xl font-bold text-secondary tracking-tight mb-2">Relational Logistics Map</h1>
+          <p className="text-secondary/70 font-medium">Visualizing Dijkstra vs. A* trajectory optimization.</p>
         </div>
         <div className="flex gap-3">
           <button 
             onClick={resetMap}
-            className="p-2 bg-white border border-slate-200 rounded-md text-slate-500 hover:text-slate-900 transition-colors"
+            className="p-2 bg-white/60 border border-secondary/10 rounded-md text-secondary/70 hover:text-secondary transition-colors shadow-sm"
           >
             <RotateCcw className="h-5 w-5" />
           </button>
-          <div className="flex items-center bg-white border border-slate-200 rounded-md px-3 h-10 shadow-sm">
+          <div className="flex items-center bg-white/60 border border-secondary/10 rounded-md px-3 h-10 shadow-sm">
             <input 
               type="checkbox" 
               id="compare" 
               checked={showComparison}
               onChange={() => setShowComparison(!showComparison)}
-              className="h-4 w-4 text-primary focus:ring-primary border-slate-300 rounded" 
+              className="h-4 w-4 text-primary focus:ring-primary border-secondary/20 rounded" 
             />
-            <label htmlFor="compare" className="ml-2 text-xs font-bold text-slate-700 cursor-pointer uppercase tracking-wider">Compare Modes</label>
+            <label htmlFor="compare" className="ml-2 text-xs font-bold text-secondary cursor-pointer uppercase tracking-wider">Compare Modes</label>
           </div>
         </div>
       </div>
@@ -188,13 +204,16 @@ function NetworkMapContent() {
             nodes={nodes} 
             edges={edges} 
             activePath={activePath} 
+            comparisonPath={comparisonPath}
+            originNodeId={restaurants.find(r => r.name === origin)?.location_node}
+            destinationNodeId={destination}
             className="h-[750px]"
           />
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-md p-6 shadow-sm">
-            <h2 className="text-lg font-bold mb-6 flex items-center">
+          <div className="bg-white/60 backdrop-blur-xl border border-secondary/10 rounded-xl p-6 shadow-sm">
+            <h2 className="text-lg font-bold mb-6 flex items-center text-secondary">
               <Navigation className="h-5 w-5 mr-3 text-primary" />
               Intelligence Engine
             </h2>
@@ -202,13 +221,13 @@ function NetworkMapContent() {
             <div className="space-y-4">
               {!showComparison && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Primary Algorithm</label>
-                  <div className="flex p-1 bg-slate-100 rounded-md">
+                  <label className="block text-xs font-bold text-secondary/70 uppercase mb-2 tracking-wider">Primary Algorithm</label>
+                  <div className="flex p-1 bg-white/40 border border-secondary/10 rounded-md">
                     <button
                       onClick={() => setAlgorithm('astar')}
                       className={cn(
                         "flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition-all",
-                        algorithm === 'astar' ? "bg-white text-primary shadow-sm" : "text-slate-500"
+                        algorithm === 'astar' ? "bg-white text-primary shadow-sm" : "text-secondary/60"
                       )}
                     >
                       A* Search
@@ -217,7 +236,7 @@ function NetworkMapContent() {
                       onClick={() => setAlgorithm('dijkstra')}
                       className={cn(
                         "flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition-all",
-                        algorithm === 'dijkstra' ? "bg-white text-amber-600 shadow-sm" : "text-slate-500"
+                        algorithm === 'dijkstra' ? "bg-white text-accent shadow-sm" : "text-secondary/60"
                       )}
                     >
                       Dijkstra
@@ -228,11 +247,11 @@ function NetworkMapContent() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Start Node (Restaurant)</label>
+                <label className="block text-xs font-bold text-secondary/70 uppercase mb-2 tracking-wider">Start Node (Restaurant)</label>
                 <select 
                   value={origin}
                   onChange={(e) => setOrigin(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                  className="w-full bg-white/40 border border-secondary/10 rounded-md px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-secondary"
                 >
                   <option value="" disabled>Select Origin</option>
                   {restaurants.map(r => (
@@ -242,19 +261,21 @@ function NetworkMapContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">End Node (Customer ID)</label>
-                <input 
-                  type="number" 
-                  min={1} 
-                  max={15} 
+                <label className="block text-xs font-bold text-secondary/70 uppercase mb-2 tracking-wider">End Node (Customer ID)</label>
+                <select 
                   value={destination}
                   onChange={(e) => setDestination(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                />
+                  className="w-full bg-white/40 border border-secondary/10 rounded-md px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-secondary"
+                >
+                  <option value={0} disabled>Select Destination Node</option>
+                  {nodes.map(n => (
+                    <option key={n.node_id} value={n.node_id}>Node {n.node_id}: {n.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wider">Traffic Simulation</label>
+                <label className="block text-xs font-bold text-secondary/70 uppercase mb-2 tracking-wider">Traffic Simulation</label>
                 <div className="grid grid-cols-2 gap-2">
                   {['Auto', 'Normal', 'Heavy', 'Jammed'].map((t) => (
                     <button
@@ -264,7 +285,7 @@ function NetworkMapContent() {
                         "py-2 text-[10px] font-bold uppercase rounded border transition-all",
                         traffic === t.toLowerCase() 
                           ? "bg-primary text-white border-primary" 
-                          : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                          : "bg-white/60 text-secondary/70 border-secondary/10 hover:bg-white"
                       )}
                     >
                       {t}
@@ -276,7 +297,7 @@ function NetworkMapContent() {
               <button 
                 onClick={handleCalculate}
                 disabled={calculating || !origin || !destination}
-                className="w-full bg-slate-900 text-white font-bold py-3 rounded-md mt-4 hover:bg-slate-800 transition-all flex items-center justify-center disabled:opacity-50"
+                className="w-full bg-primary text-white font-bold py-3 rounded-md mt-4 hover:bg-primary-hover transition-all flex items-center justify-center disabled:opacity-50"
               >
                 {calculating ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -290,34 +311,44 @@ function NetworkMapContent() {
         </div>
 
           {stats && (
-            <div className="bg-slate-900 border border-primary/30 rounded-md p-6 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="bg-white/60 backdrop-blur-xl border border-secondary/10 rounded-xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
               <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-4 flex items-center">
                 <Zap className="h-3 w-3 mr-2" />
                 Live Order: {orderId ? `#REL-${orderId}` : 'CALCULATION'}
               </h3>
               <div className="space-y-4">
-                <div className="flex justify-between items-end border-b border-white/5 pb-3">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Relational Score</span>
-                  <span className="text-xl font-bold tracking-tight text-white data-value">98.2%</span>
+                <div className="flex justify-between items-end border-b border-secondary/10 pb-3">
+                  <span className="text-xs text-secondary/60 font-bold uppercase">Relational Score</span>
+                  <span className="text-xl font-bold tracking-tight text-secondary data-value">98.2%</span>
                 </div>
-                <div className="flex justify-between items-end border-b border-white/5 pb-3">
-                  <span className="text-xs text-slate-400 font-bold uppercase">Node Distance</span>
-                  <span className="text-xl font-bold tracking-tight text-white data-value">{stats.distance.toFixed(2)}U</span>
+                <div className="flex justify-between items-end border-b border-secondary/10 pb-3">
+                  <span className="text-xs text-secondary/60 font-bold uppercase flex flex-col">
+                    Physical Distance
+                    <span className="text-[9px] font-normal normal-case opacity-70">Raw Map Route</span>
+                  </span>
+                  <span className="text-xl font-bold tracking-tight text-secondary data-value">{activePhysicalDistance.toFixed(1)} km</span>
+                </div>
+                <div className="flex justify-between items-end border-b border-secondary/10 pb-3">
+                  <span className="text-xs text-amber-600 font-bold uppercase flex flex-col">
+                    Effective Distance
+                    <span className="text-[9px] font-normal normal-case opacity-70 text-secondary">AI Traffic Multiplier</span>
+                  </span>
+                  <span className="text-xl font-bold tracking-tight text-amber-600 data-value">{stats.distance.toFixed(1)} km</span>
                 </div>
                 <div className="flex justify-between items-end">
-                  <span className="text-xs text-slate-400 font-bold uppercase">ETA Protocol</span>
+                  <span className="text-xs text-secondary/60 font-bold uppercase">ETA Protocol</span>
                   <span className="text-xl font-bold tracking-tight text-primary data-value">{stats.time}m</span>
                 </div>
               </div>
               
               {/* Node Progress Bar */}
               <div className="mt-6">
-                <div className="flex justify-between text-[8px] font-bold text-slate-500 uppercase mb-2">
+                <div className="flex justify-between text-[8px] font-bold text-secondary/60 uppercase mb-2">
                   <span>Warehouse</span>
                   <span>Pickup</span>
                   <span>Drop-off</span>
                 </div>
-                <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                <div className="h-1 w-full bg-secondary/10 rounded-full overflow-hidden flex">
                   <div className="h-full bg-primary w-2/3" />
                 </div>
               </div>
@@ -326,33 +357,33 @@ function NetworkMapContent() {
 
           {/* Search Efficiency Panel */}
           {efficiency && (
-            <div className="bg-primary/5 border border-primary/20 rounded-md p-6">
+            <div className="bg-white/60 backdrop-blur-xl border border-secondary/10 rounded-xl p-6 shadow-sm">
               <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-4">Search Efficiency</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[8px] text-slate-500 uppercase font-bold mb-1">Nodes Explored</p>
-                  <p className="text-lg font-bold text-slate-900 data-value">{efficiency.nodesExplored}</p>
+                  <p className="text-[8px] text-secondary/60 uppercase font-bold mb-1">Nodes Explored</p>
+                  <p className="text-lg font-bold text-secondary data-value">{efficiency.nodesExplored}</p>
                 </div>
                 <div>
-                  <p className="text-[8px] text-slate-500 uppercase font-bold mb-1">Path Velocity</p>
-                  <p className="text-lg font-bold text-slate-900 data-value">{(efficiency.pathDistance / efficiency.nodesExplored).toFixed(2)}</p>
+                  <p className="text-[8px] text-secondary/60 uppercase font-bold mb-1">Path Velocity</p>
+                  <p className="text-lg font-bold text-secondary data-value">{(efficiency.pathDistance / efficiency.nodesExplored).toFixed(2)}</p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="bg-slate-50 border border-slate-200 rounded-md p-5">
+          <div className="bg-white/60 backdrop-blur-xl border border-secondary/10 rounded-xl p-5 shadow-sm">
             <div className="flex items-center mb-3">
-              <Info className="h-4 w-4 text-slate-400 mr-2" />
-              <h3 className="text-sm font-bold text-slate-600">Legend</h3>
+              <Info className="h-4 w-4 text-secondary/50 mr-2" />
+              <h3 className="text-sm font-bold text-secondary">Legend</h3>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center text-xs text-slate-500">
-                <div className="h-2 w-2 bg-primary rounded-full mr-2 shadow-[0_0_5px_#0052FF]" />
+              <div className="flex items-center text-xs text-secondary/70">
+                <div className="h-2 w-2 bg-primary rounded-full mr-2 shadow-[0_0_5px_#B77466]" />
                 Active Relational Path
               </div>
-              <div className="flex items-center text-xs text-slate-500">
-                <div className="h-1 w-4 border-t border-dashed border-slate-400 mr-2" />
+              <div className="flex items-center text-xs text-secondary/70">
+                <div className="h-1 w-4 border-t border-dashed border-secondary/40 mr-2" />
                 Dormant Grid Edge
               </div>
             </div>
@@ -366,7 +397,7 @@ function NetworkMapContent() {
             {calculating ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
-              "Protocol: Initiate Order"
+              "Protocol: Simulate Order"
             )}
           </button>
         </div>

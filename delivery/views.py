@@ -3,11 +3,80 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.db import connection
 import requests
+import joblib
+import pandas as pd
 
-from delivery_brain import get_restaurant_node, calculate_shortest_path, calculate_shortest_path_astar
-from .models import MapNode, MapEdge, Restaurant, MenuItem, User, Order
-from .serializers import MapNodeSerializer, MapEdgeSerializer, RestaurantSerializer, MenuItemSerializer
+from delivery_brain import get_restaurant_node, calculate_shortest_path, calculate_shortest_path_astar, get_current_traffic_condition
+from .models import MapNode, MapEdge, Restaurant, MenuItem, User, Order, OrderItem
+from .serializers import MapNodeSerializer, MapEdgeSerializer, RestaurantSerializer, MenuItemSerializer, OrderSerializer
 
+
+@api_view(['POST'])
+def user_login(request):
+    """
+    Authenticate a user by email & password.
+    Returns user profile including their location node so the frontend
+    can automatically use it as the delivery destination.
+    """
+    email = request.data.get('email', '').strip().lower()
+    password = request.data.get('password', '')
+
+    if not email or not password:
+        return Response({'error': 'Email and password are required.'}, status=400)
+
+    try:
+        user = User.objects.select_related('location').get(email__iexact=email, password=password)
+        return Response({
+            'success': True,
+            'user': {
+                'user_id': user.user_id,
+                'name': user.name,
+                'email': user.email,
+                'location_node_id': user.location.node_id if user.location else None,
+                'location_name': user.location.name if user.location else 'Unknown',
+            }
+        })
+    except User.DoesNotExist:
+        return Response({'error': 'Invalid email or password.'}, status=401)
+
+@api_view(['POST'])
+def user_signup(request):
+    """
+    Register a new user and assign a delivery node.
+    """
+    name = request.data.get('name', '').strip()
+    email = request.data.get('email', '').strip().lower()
+    password = request.data.get('password', '')
+    location_node_id = request.data.get('location_node_id')
+
+    if not name or not email or not password or not location_node_id:
+        return Response({'error': 'Name, email, password, and location are required.'}, status=400)
+
+    if User.objects.filter(email__iexact=email).exists():
+        return Response({'error': 'Email is already registered.'}, status=400)
+
+    try:
+        location_node = MapNode.objects.get(node_id=location_node_id)
+    except MapNode.DoesNotExist:
+        return Response({'error': 'Invalid location selected.'}, status=400)
+
+    user = User.objects.create(
+        name=name,
+        email=email,
+        password=password,
+        location=location_node
+    )
+
+    return Response({
+        'success': True,
+        'user': {
+            'user_id': user.user_id,
+            'name': user.name,
+            'email': user.email,
+            'location_node_id': user.location.node_id if user.location else None,
+            'location_name': user.location.name if user.location else 'Unknown',
+        }
+    }, status=201)
 
 class MapNodeList(generics.ListCreateAPIView):
     queryset = MapNode.objects.all()
@@ -30,6 +99,16 @@ class MenuItemListView(generics.ListAPIView):
         restaurant_id = self.request.query_params.get('restaurant')
         if restaurant_id:
             queryset = queryset.filter(restaurant_id=restaurant_id)
+        return queryset
+
+class OrderListView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        queryset = Order.objects.all().order_by('-created_at')
+        user_id = self.request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
         return queryset
 
 # NEW VIEW (Your Backend/Database Order API)
@@ -175,21 +254,37 @@ def place_order_with_path(request):
     """
     user_id = request.data.get('user_id')
     restaurant_id = request.data.get('restaurant_id')
+    destination_node_id = request.data.get('destination_node')
+    items_data = request.data.get('items', []) # List of {item_id, quantity}
     
     if not user_id or not restaurant_id:
         return Response({"error": "Missing user_id or restaurant_id"}, status=400)
     
     try:
-        user = User.objects.get(pk=user_id)
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            user = User.objects.first()
+            if not user:
+                return Response({"error": "No users exist in the database"}, status=404)
+                
         restaurant = Restaurant.objects.get(pk=restaurant_id)
         
-        if not user.location or not restaurant.location_node:
-            return Response({"error": "User or Restaurant location node not defined"}, status=400)
+        # Resolve Destination Node
+        if destination_node_id:
+            dest_node_id = int(destination_node_id)
+        else:
+            if not user.location:
+                return Response({"error": "User location node not defined"}, status=400)
+            dest_node_id = user.location.node_id
+            
+        if not restaurant.location_node:
+            return Response({"error": "Restaurant location node not defined"}, status=400)
             
         # Generate the path using existing A* logic
         distance, path_nodes = calculate_shortest_path_astar(
             restaurant.location_node.node_id, 
-            user.location.node_id, 
+            dest_node_id, 
             traffic_level='auto'
         )
         
@@ -203,14 +298,91 @@ def place_order_with_path(request):
             delivery_path=",".join(map(str, path_nodes)),
             status='Pending'
         )
+
+        # Process actual items
+        total_qty = 0
+        order_total = 0
         
+        for item_data in items_data:
+            try:
+                m_item = MenuItem.objects.get(pk=item_data['item_id'])
+                qty = item_data['quantity']
+                OrderItem.objects.create(order=order, menu_item=m_item, quantity=qty)
+                order_total += m_item.price * qty
+                total_qty += qty
+            except MenuItem.DoesNotExist:
+                continue
+
+        # If no items provided (legacy/mock), fallback to first item
+        if not items_data:
+            first_item = MenuItem.objects.filter(restaurant=restaurant).first()
+            if first_item:
+                OrderItem.objects.create(order=order, menu_item=first_item, quantity=1)
+                order_total = first_item.price
+                total_qty = 1
+        
+        order.total_price = order_total
+        order.save()
+        
+        # Get actual nodes for location coordinates
+        dest_node = MapNode.objects.get(pk=dest_node_id)
+        
+        # Trigger n8n Webhook
+        import os
+        from dotenv import load_dotenv
+        import requests
+        load_dotenv()
+        
+        n8n_webhook_url = os.environ.get('N8N_WEBHOOK_URL', "https://sibyl-tetradynamous-griselda.ngrok-free.dev/webhook-test/order-placed")
+        
+        try:
+            n8n_data = {
+                "customer_name": user.name,
+                "customer_email": user.email,
+                "restaurant_name": restaurant.name,
+                "item_name": first_item.name if first_item else "Custom Order",
+                "quantity": 1,
+                "total_price": float(order.total_price) if order.total_price else 0.0
+            }
+            requests.post(n8n_webhook_url, json=n8n_data, timeout=3)
+            print("Webhook fired to n8n successfully from pathfinder!")
+        except Exception as e:
+            print(f"n8n webhook failed: {e}")
+        
+        # SMART ETA: Use ML Model if available
+        estimated_time = int(distance * 2) # Default fallback
+        prediction_method = "Hardcoded"
+        
+        try:
+            model_path = os.path.join(os.getcwd(), 'eta_model.pkl')
+            if os.path.exists(model_path):
+                model = joblib.load(model_path)
+                
+                # Get current traffic multiplier
+                traffic_level = get_current_traffic_condition()
+                multipliers = { "light": 0.8, "normal": 1.0, "heavy": 1.5, "jammed": 2.5 }
+                t_mult = multipliers.get(traffic_level.lower(), 1.0)
+                
+                # Real Order Size from items
+                order_size = total_qty 
+                
+                # Predict!
+                features = pd.DataFrame([[distance, order_size, t_mult]], 
+                                       columns=['distance', 'order_size', 'traffic_multiplier'])
+                pred = model.predict(features)[0]
+                estimated_time = int(pred)
+                prediction_method = f"AI Model (Size: {order_size})"
+        except Exception as e:
+            print(f"ML Prediction failed: {e}")
+
         return Response({
             "status": "success",
             "order_id": order.order_id,
             "path": path_nodes,
             "distance": round(distance, 2),
-            "estimated_time": int(distance * 2), # 2 mins per unit
-            "customer_location": {"x": user.location.x_coordinate, "y": user.location.y_coordinate},
+            "estimated_time": estimated_time,
+            "prediction_method": prediction_method,
+            "customer_location": {"x": dest_node.x_coordinate, "y": dest_node.y_coordinate},
             "restaurant_location": {"x": restaurant.location_node.x_coordinate, "y": restaurant.location_node.y_coordinate}
         }, status=201)
         
@@ -218,5 +390,112 @@ def place_order_with_path(request):
         return Response({"error": "User not found"}, status=404)
     except Restaurant.DoesNotExist:
         return Response({"error": "Restaurant not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['PATCH', 'DELETE'])
+def update_order_status(request, order_id):
+    try:
+        order = Order.objects.get(pk=order_id)
+        
+        if request.method == 'DELETE':
+            order.delete()
+            return Response({"status": "success", "message": "Order deleted"})
+            
+        status = request.data.get('status')
+        if status:
+            order.status = status
+            order.save()
+            return Response({"status": "success", "order_id": order_id, "new_status": status})
+        return Response({"error": "No status provided"}, status=400)
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=404)
+
+@api_view(['PATCH'])
+def rate_order(request, order_id):
+    """
+    User-facing endpoint to rate and review a delivered order.
+    Trigger auto_update_restaurant_rating will handle the average calculation.
+    """
+    try:
+        order = Order.objects.get(pk=order_id)
+        
+        # Only allow rating if delivered
+        if order.status != 'Delivered':
+            return Response({"error": "Order must be delivered before rating"}, status=400)
+            
+        rating = request.data.get('rating')
+        review = request.data.get('review')
+        
+        if rating is not None:
+            order.rating = int(rating)
+        if review is not None:
+            order.review = review
+            
+        order.save()
+        return Response({
+            "status": "success", 
+            "order_id": order_id, 
+            "rating": order.rating,
+            "review": order.review
+        })
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['PATCH'])
+def update_user_location(request, user_id):
+    """
+    Update a user's preferred delivery location node.
+    """
+    try:
+        user = User.objects.get(pk=user_id)
+        location_node_id = request.data.get('location_node_id')
+        
+        if not location_node_id:
+            return Response({"error": "No location_node_id provided"}, status=400)
+            
+        location_node = MapNode.objects.get(node_id=location_node_id)
+        user.location = location_node
+        user.save()
+        
+        return Response({
+            "status": "success",
+            "user": {
+                "user_id": user.user_id,
+                "name": user.name,
+                "email": user.email,
+                "location_node_id": user.location.node_id,
+                "location_name": user.location.name
+            }
+        })
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=404)
+    except MapNode.DoesNotExist:
+        return Response({"error": "Invalid location node"}, status=400)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+def get_restaurant_reviews(request, restaurant_id):
+    """
+    Fetch all reviews and ratings for a specific restaurant.
+    """
+    try:
+        reviews = Order.objects.filter(
+            restaurant_id=restaurant_id, 
+            rating__isnull=False
+        ).select_related('user').order_by('-created_at')
+        
+        data = []
+        for r in reviews:
+            data.append({
+                "user_name": r.user.name,
+                "rating": r.rating,
+                "review": r.review,
+                "created_at": r.created_at
+            })
+        return Response(data)
     except Exception as e:
         return Response({"error": str(e)}, status=500)

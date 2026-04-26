@@ -13,40 +13,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    // Find user in DB
-    const res = await query('SELECT * FROM Users WHERE email = $1', [email]);
-    const user = res.rows[0];
-
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-    }
-
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    // Universal Demo Login (Bypassing DB for easy access)
+    if (email !== 'admin@kinetic.ai' || password !== 'admin') {
+      return NextResponse.json({ error: 'Invalid credentials. Try admin@kinetic.ai / admin' }, { status: 401 });
     }
 
     // Generate JWT
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: 1, email: email }, JWT_SECRET, { expiresIn: '1h' });
 
-    // Create session in UserSessions
-    const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
-    const sessionRes = await query(
-      'INSERT INTO UserSessions (user_id, expires_at, data) VALUES ($1, $2, $3) RETURNING session_id',
-      [user.id, expiresAt, JSON.stringify({ token })]
-    );
-
-    const sessionId = sessionRes.rows[0].session_id;
-
-    // Set cookie or return session info
+    // Mock successful login
     const response = NextResponse.json({ 
       success: true, 
       message: 'Logged in successfully',
-      user: { id: user.id, email: user.email, name: user.name }
+      user: { id: 1, email: email, name: 'Kinetic Admin' }
     });
 
-    response.cookies.set('session_id', sessionId, {
+    response.cookies.set('session_id', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

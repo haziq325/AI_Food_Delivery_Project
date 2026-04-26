@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapNode, MapEdge } from "@/lib/types";
@@ -22,10 +22,21 @@ interface LeafletMapProps {
   nodes: MapNode[];
   edges: MapEdge[];
   activePath?: number[];
+  comparisonPath?: number[];
+  originNodeId?: number;
+  destinationNodeId?: number;
   className?: string;
   center?: [number, number];
   zoom?: number;
 }
+
+const KARACHI_LAT = 24.8607;
+const KARACHI_LNG = 67.0011;
+const SCALE = 0.01; // Scale arbitrary coordinates so they fit within city limits
+
+const getMapCoords = (x: number, y: number): [number, number] => {
+  return [KARACHI_LAT + (y * SCALE), KARACHI_LNG + (x * SCALE)];
+};
 
 // Internal component to handle map bounds and fitting
 function MapBoundsHandler({ nodes }: { nodes: MapNode[] }) {
@@ -33,7 +44,7 @@ function MapBoundsHandler({ nodes }: { nodes: MapNode[] }) {
   
   useEffect(() => {
     if (nodes.length > 0) {
-      const bounds = L.latLngBounds(nodes.map(n => [n.y_coordinate, n.x_coordinate] as [number, number]));
+      const bounds = L.latLngBounds(nodes.map(n => getMapCoords(n.x_coordinate, n.y_coordinate)));
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [nodes, map]);
@@ -45,8 +56,11 @@ export default function LeafletMap({
   nodes,
   edges,
   activePath = [],
+  comparisonPath = [],
+  originNodeId,
+  destinationNodeId,
   className,
-  center = [0, 0],
+  center = [KARACHI_LAT, KARACHI_LNG],
   zoom = 13,
 }: LeafletMapProps) {
   const [isMounted, setIsMounted] = useState(false);
@@ -84,26 +98,50 @@ export default function LeafletMap({
             <Polyline
               key={`edge-${edge.edge_id}`}
               positions={[
-                [from.y_coordinate, from.x_coordinate],
-                [to.y_coordinate, to.x_coordinate]
+                getMapCoords(from.x_coordinate, from.y_coordinate),
+                getMapCoords(to.x_coordinate, to.y_coordinate)
               ]}
               pathOptions={{
-                color: "#1e293b",
-                weight: 2,
-                dashArray: "5, 10",
-                opacity: 0.5
+                color: "#cbd5e1",
+                weight: 1.5,
+                dashArray: "4, 8",
+                opacity: 0.3
               }}
-            />
+            >
+              <Tooltip permanent direction="center" className="bg-transparent border-none text-secondary/60 font-mono text-[9px] font-bold shadow-none" opacity={0.7}>
+                {edge.distance} km
+              </Tooltip>
+            </Polyline>
           );
         })}
+
+        {/* Comparison Path (Dijkstra) - Amber/Warning Color */}
+        {comparisonPath.length > 1 && (
+          <Polyline
+            positions={comparisonPath
+              .map(nodeId => nodes.find(n => n.node_id === nodeId))
+              .filter((node): node is MapNode => !!node)
+              .map(node => getMapCoords(node.x_coordinate, node.y_coordinate))
+            }
+            pathOptions={{
+              color: "#f59e0b", // Amber warning color
+              weight: 5,
+              lineCap: "round",
+              lineJoin: "round",
+              dashArray: "10, 10",
+              fill: false
+            }}
+          />
+        )}
 
         {/* Active Delivery Path - Electric Blue */}
         {activePath.length > 1 && (
           <Polyline
-            positions={activePath.map(nodeId => {
-              const node = nodes.find(n => n.node_id === nodeId);
-              return node ? [node.y_coordinate, node.x_coordinate] : [0, 0];
-            }) as [number, number][]}
+            positions={activePath
+              .map(nodeId => nodes.find(n => n.node_id === nodeId))
+              .filter((node): node is MapNode => !!node)
+              .map(node => getMapCoords(node.x_coordinate, node.y_coordinate))
+            }
             pathOptions={{
               color: "#0052FF",
               weight: 5,
@@ -111,39 +149,47 @@ export default function LeafletMap({
               lineJoin: "round",
               fill: false
             }}
-            eventHandlers={{
-                add: (e) => {
-                    const polyline = e.target;
-                    polyline.setStyle({
-                        filter: 'drop-shadow(0 0 8px #0052FF)'
-                    } as any);
-                }
-            }}
           />
         )}
 
         {/* Nodes (Intersections) */}
         {nodes.map((node) => {
-          const isInPath = activePath.includes(node.node_id);
+          const isInPath = activePath.includes(node.node_id) || comparisonPath.includes(node.node_id);
+          const isOrigin = node.node_id === originNodeId;
+          const isDest = node.node_id === destinationNodeId;
           
+          let fillColor = "#334155";
+          let radius = isInPath ? 6 : 4;
+          
+          if (isOrigin) {
+            fillColor = "#10b981"; // Emerald Green
+            radius = 8;
+          } else if (isDest) {
+            fillColor = "#ef4444"; // Rose Red
+            radius = 8;
+          } else if (isInPath) {
+            fillColor = "#0052FF"; // Electric Blue
+          }
+
           return (
             <CircleMarker
               key={`node-${node.node_id}`}
-              center={[node.y_coordinate, node.x_coordinate]}
-              radius={isInPath ? 6 : 4}
+              center={getMapCoords(node.x_coordinate, node.y_coordinate)}
+              radius={radius}
               pathOptions={{
-                fillColor: isInPath ? "#0052FF" : "#334155",
+                fillColor: fillColor,
                 fillOpacity: 1,
-                color: isInPath ? "#ffffff" : "#1e293b",
-                weight: 1,
+                color: (isOrigin || isDest || isInPath) ? "#ffffff" : "#1e293b",
+                weight: (isOrigin || isDest) ? 2 : 1,
               }}
             >
-              <Popup>
+              <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                 <div className="text-xs font-bold font-mono">
-                  NODE: {node.name}<br/>
-                  COORD: [{node.x_coordinate}, {node.y_coordinate}]
+                  {isOrigin && <span className="text-emerald-500 mr-1">[START]</span>}
+                  {isDest && <span className="text-rose-500 mr-1">[END]</span>}
+                  NODE {node.node_id}: {node.name}
                 </div>
-              </Popup>
+              </Tooltip>
             </CircleMarker>
           );
         })}
@@ -158,8 +204,14 @@ export default function LeafletMap({
       <div className="absolute bottom-4 right-6 z-[1000] flex gap-3 pointer-events-none">
         <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded text-[10px] font-bold text-slate-300 flex items-center">
             <div className="h-2 w-2 bg-primary animate-pulse rounded-full mr-2" />
-            LIVE TRAJECTORY
+            PRIMARY TRAJECTORY
         </div>
+        {comparisonPath.length > 1 && (
+          <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded text-[10px] font-bold text-slate-300 flex items-center">
+              <div className="h-2 w-2 bg-amber-500 rounded-full mr-2" />
+              COMPARISON PATH
+          </div>
+        )}
       </div>
     </div>
   );

@@ -76,10 +76,24 @@ def seed_database_from_json():
     except FileNotFoundError:
         print("Error: Could not find 'food_data.json'. Make sure it is saved in the same folder as seed.py!")
 
-    # --- 3. SEED A TEST USER ---
-    print("Creating a Test User...")
-    User.objects.create(name="Test User", email="test@foodapp.com", password="password123")
-    
+    # --- 3. SEED USERS WITH LOCATION NODES ---
+    print("Creating Users with location nodes...")
+    users_to_create = [
+        {"name": "Usman Sheikh",  "email": "usman@swiftbite.com",  "password": "usman123",  "node_id": 9},   # West Plaza
+        {"name": "Sara Ahmed",    "email": "sara@swiftbite.com",   "password": "sara123",   "node_id": 6},   # Customer Area A
+        {"name": "Ali Hassan",    "email": "ali@swiftbite.com",    "password": "ali123",    "node_id": 7},   # Customer Area B
+        {"name": "Demo User",     "email": "admin@kinetic.ai",     "password": "admin",     "node_id": 6},   # Customer Area A (demo login)
+        {"name": "Test User",     "email": "test@foodapp.com",     "password": "password123","node_id": 11},  # High Street
+    ]
+    for u in users_to_create:
+        location_node = created_nodes.get(u["node_id"])
+        User.objects.create(
+            name=u["name"],
+            email=u["email"],
+            password=u["password"],
+            location=location_node,
+        )
+
     print("Database is fully seeded and ready for your AI algorithms!")
 
 if __name__ == '__main__':

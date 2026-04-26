@@ -59,6 +59,7 @@ class Order(models.Model):
     total_price = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
     status = models.CharField(max_length=50, default="Pending", choices=STATUS_CHOICES)
     rating = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    review = models.TextField(null=True, blank=True)
     delivery_path = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
 

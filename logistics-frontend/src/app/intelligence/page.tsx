@@ -44,8 +44,8 @@ export default function IntelligencePage() {
     <AppLayout>
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 uppercase">Relational Intelligence</h1>
-          <p className="text-slate-500 text-sm font-mono tracking-tight">High-performance culinary matches optimized for peak velocity.</p>
+          <h1 className="text-3xl font-bold text-secondary tracking-tight mb-2 uppercase">Relational Intelligence</h1>
+          <p className="text-secondary/70 text-sm font-mono tracking-tight">High-performance culinary matches optimized for peak velocity.</p>
         </div>
       </div>
 
@@ -86,7 +86,7 @@ export default function IntelligencePage() {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <span className="ml-3 text-slate-500 font-medium">Optimizing Graph...</span>
+            <span className="ml-3 text-secondary/70 font-medium">Optimizing Graph...</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -97,23 +97,23 @@ export default function IntelligencePage() {
         )}
       </div>
 
-      <div className="bg-slate-900 rounded-md p-8 text-white border border-white/5 relative overflow-hidden">
+      <div className="bg-white/60 backdrop-blur-xl rounded-xl p-8 text-secondary border border-secondary/10 shadow-[0_8px_32px_0_rgba(183,116,102,0.1)] relative overflow-hidden">
         <div className="relative z-10">
-          <h2 className="text-2xl font-bold mb-4 tracking-tight">Node Relationship Analysis</h2>
-          <p className="text-slate-400 max-w-2xl mb-6">
+          <h2 className="text-2xl font-bold mb-4 tracking-tight text-primary">Node Relationship Analysis</h2>
+          <p className="text-secondary/80 max-w-2xl mb-6">
             Our graph-based topology engine analyzes the Dijkstra pathfinding history against A* performance 
             to identify high-traffic vectors in the city grid.
           </p>
           <div className="flex gap-4">
-            <div className="bg-white/10 px-4 py-2 rounded text-sm font-bold border border-white/10">
+            <div className="bg-secondary/5 px-4 py-2 rounded-md text-sm font-bold border border-secondary/10 text-secondary">
               Total Nodes: 15
             </div>
-            <div className="bg-white/10 px-4 py-2 rounded text-sm font-bold border border-white/10">
+            <div className="bg-secondary/5 px-4 py-2 rounded-md text-sm font-bold border border-secondary/10 text-secondary">
               Active Edges: 24
             </div>
           </div>
         </div>
-        <div className="absolute right-0 top-0 h-full w-1/3 opacity-20 bg-gradient-to-l from-primary to-transparent" />
+        <div className="absolute right-0 top-0 h-full w-1/3 opacity-10 bg-gradient-to-l from-primary to-transparent" />
       </div>
     </AppLayout>
   );

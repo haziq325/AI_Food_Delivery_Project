@@ -2,171 +2,224 @@
 
 import { useEffect, useState } from "react";
 import AppLayout from "@/components/AppLayout";
-import { getRestaurants, getMenuItems, placeOrder } from "@/lib/api";
-import { Restaurant, MenuItem } from "@/lib/types";
-import { Send, ShoppingBag, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { getOrders, updateOrderStatus, deleteOrder } from "@/lib/api";
+import { motion } from "framer-motion";
+import { Send, Clock, CheckCircle2, Zap, AlertCircle, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export interface Order {
+  order_id: number;
+  user_name: string;
+  restaurant_name: string;
+  status: string;
+  total_price: string;
+  delivery_path: string;
+  created_at: string;
+  order_items: Array<{ menu_item_name: string, quantity: number }>;
+}
+
 export default function DispatchPage() {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [selectedRest, setSelectedRest] = useState<number | null>(null);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<number | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [orderStatus, setOrderStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getRestaurants().then(setRestaurants);
+    const fetchOrders = async () => {
+      try {
+        const data = await getOrders();
+        setOrders(data);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+    // Poll every 5s for the demo
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (selectedRest) {
-      getMenuItems(selectedRest).then(setMenuItems);
-      setSelectedItem(null);
-    }
-  }, [selectedRest]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRest || !selectedItem) return;
-
-    setLoading(true);
-    setOrderStatus(null);
+  const handleStatusChange = async (orderId: number, newStatus: string) => {
     try {
-      await placeOrder({
-        user_id: 4, // Defaulting to Lead Analyst (ID 4) for demo
-        restaurant_id: selectedRest,
-      });
-      setOrderStatus({ type: 'success', message: "Order dispatched successfully! Relational database updated via Stored Procedure." });
-    } catch (error: any) {
-      setOrderStatus({ type: 'error', message: error.response?.data?.error || "Failed to place order." });
-    } finally {
-      setLoading(false);
+      await updateOrderStatus(orderId, newStatus);
+      // Update local state for immediate feedback
+      setOrders(prev => prev.map(o => o.order_id === orderId ? { ...o, status: newStatus } : o));
+    } catch (error) {
+      console.error("Error updating order status:", error);
+    }
+  };
+
+  const handleDelete = async (orderId: number) => {
+    if (!window.confirm("Are you sure you want to delete this order?")) return;
+    try {
+      await deleteOrder(orderId);
+      setOrders(prev => prev.filter(o => o.order_id !== orderId));
+    } catch (error) {
+      console.error("Error deleting order:", error);
+    }
+  };
+
+  const STATUS_OPTIONS = ['Pending', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'];
+
+  const getStatusIcon = (status: string) => {
+    switch(status) {
+      case 'Pending': return <Clock className="h-3 w-3" />;
+      case 'Out for Delivery': return <Send className="h-3 w-3" />;
+      case 'Delivered': return <CheckCircle2 className="h-3 w-3" />;
+      default: return <AlertCircle className="h-3 w-3" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case 'Pending': return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      case 'Out for Delivery': return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+      case 'Delivered': return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+      default: return "bg-secondary/10 text-secondary border-secondary/20";
     }
   };
 
   return (
     <AppLayout>
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2 uppercase">Dispatch Center</h1>
-        <p className="text-slate-500 text-sm font-mono tracking-tight">Direct interface to the PostgreSQL relational execution layer.</p>
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-secondary uppercase">Active Dispatch</h1>
+          <p className="text-secondary/70 mt-1 font-mono text-sm uppercase tracking-wider">Live Network Trajectories</p>
+        </div>
+        <div className="flex items-center text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 shadow-sm">
+          <span className="relative flex h-2 w-2 mr-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          Live Sync Active
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-slate-200 rounded-md p-8 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
-            <h2 className="text-lg font-bold mb-8 flex items-center uppercase tracking-tight">
-              <ShoppingBag className="h-5 w-5 mr-3 text-primary" />
-              New Logistics Request
-            </h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-3 tracking-[0.2em]">Restaurant (Node Origin)</label>
-                  <select 
-                    value={selectedRest || ""}
-                    onChange={(e) => setSelectedRest(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-sm px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
+      <div className="bg-white/60 backdrop-blur-xl border border-secondary/10 rounded-xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-[10px] text-secondary/60 uppercase tracking-widest bg-secondary/5 border-b border-secondary/10 font-bold">
+              <tr>
+                <th className="px-6 py-4 rounded-tl-xl">Order Ref</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Customer</th>
+                <th className="px-6 py-4">Items</th>
+                <th className="px-6 py-4">Restaurant</th>
+                <th className="px-6 py-4">Trajectory (Path)</th>
+                <th className="px-6 py-4 text-center">Protocol</th>
+                <th className="px-6 py-4 rounded-tr-xl text-right">Timestamp</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <div className="h-8 w-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                      <p className="text-secondary/50 font-mono text-[10px] uppercase tracking-widest">Polling Network...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3 text-secondary/50">
+                      <AlertCircle className="h-8 w-8 opacity-50" />
+                      <p className="font-mono text-[10px] uppercase tracking-widest">No Active Orders in Network</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                orders.map((order, i) => (
+                  <motion.tr 
+                    key={order.order_id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="border-b border-secondary/5 hover:bg-white/40 transition-colors group"
                   >
-                    <option value="" disabled>Select Source Node</option>
-                    {restaurants.map(r => (
-                      <option key={r.restaurant_id} value={r.restaurant_id}>{r.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-3 tracking-[0.2em]">Catalog Item</label>
-                  <select 
-                    value={selectedItem || ""}
-                    onChange={(e) => setSelectedItem(Number(e.target.value))}
-                    disabled={!selectedRest}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-sm px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:opacity-50 outline-none"
-                  >
-                    <option value="" disabled>Select Item</option>
-                    {menuItems.map(item => (
-                      <option key={item.item_id} value={item.item_id}>{item.name} - ${item.price}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-end gap-8">
-                <div className="w-32">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-3 tracking-[0.2em]">Quantity</label>
-                  <input 
-                    type="number" 
-                    min={1} 
-                    max={10} 
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-sm px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-                  />
-                </div>
-                
-                <button 
-                  type="submit"
-                  disabled={loading || !selectedRest || !selectedItem}
-                  className="flex-1 bg-primary text-white font-bold py-4 px-6 rounded-sm shadow-lg shadow-primary/20 hover:bg-primary-hover transition-all flex items-center justify-center disabled:opacity-50 uppercase tracking-[0.2em] text-xs"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-3" />
-                  )}
-                  Initialize Sequence
-                </button>
-              </div>
-            </form>
-
-            {orderStatus && (
-              <div className={cn(
-                "mt-8 p-4 rounded-md flex items-start border",
-                orderStatus.type === 'success' ? "bg-emerald-50 border-emerald-100 text-emerald-800" : "bg-rose-50 border-rose-100 text-rose-800"
-              )}>
-                {orderStatus.type === 'success' ? (
-                  <CheckCircle2 className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
-                )}
-                <p className="text-sm font-medium">{orderStatus.message}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-slate-900 border border-white/10 rounded-md p-6 text-white">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Live Dispatch Metadata</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-sm text-slate-400 font-medium">Protocol</span>
-                <span className="text-sm font-bold text-primary">POSTGRES_STORED_PROC</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-white/5">
-                <span className="text-sm text-slate-400 font-medium">Validation</span>
-                <span className="text-sm font-bold text-emerald-400">PASSED</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-slate-400 font-medium">API Latency</span>
-                <span className="text-sm font-bold text-slate-300">42ms</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white border border-slate-200 rounded-md p-6">
-            <h3 className="text-lg font-bold mb-4">Relational Context</h3>
-            <p className="text-sm text-slate-500 font-medium leading-relaxed mb-4">
-              When an order is dispatched, the system triggers a row-level lock on the `Order` table 
-              to ensure acid compliance during pathfinding calculations.
-            </p>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-primary w-2/3" />
-            </div>
-          </div>
+                    <td className="px-6 py-4 font-mono font-bold text-primary">
+                      <div className="flex items-center">
+                        <Zap className="h-3 w-3 mr-1.5 opacity-50" />
+                        REL-{order.order_id}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border",
+                        getStatusColor(order.status)
+                      )}>
+                        {getStatusIcon(order.status)}
+                        <span className="ml-1.5">{order.status}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-secondary text-xs">{order.user_name}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        {order.order_items?.map((item, idx) => (
+                          <span key={idx} className="text-[10px] text-secondary font-mono bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10 w-fit">
+                            {item.quantity}x {item.menu_item_name}
+                          </span>
+                        ))}
+                        {(!order.order_items || order.order_items.length === 0) && (
+                          <span className="text-[10px] text-secondary/40 italic">No items logged</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-secondary text-xs">{order.restaurant_name}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-1 font-mono text-[9px] text-secondary/70">
+                        {order.delivery_path ? (
+                          order.delivery_path.split(',').map((node, idx, arr) => (
+                            <span key={idx} className="flex items-center">
+                              <span className="bg-secondary/5 border border-secondary/10 px-1.5 py-0.5 rounded">N{node}</span>
+                              {idx < arr.length - 1 && <span className="mx-1 text-secondary/30">→</span>}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-rose-500 opacity-70">Path Not Generated</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <select
+                          value={order.status}
+                          onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
+                          className={cn(
+                            "px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border outline-none cursor-pointer transition-colors",
+                            order.status === 'Delivered' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                            order.status === 'Cancelled' ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                            "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                          )}
+                        >
+                          {STATUS_OPTIONS.map(status => (
+                            <option key={status} value={status} className="text-secondary bg-white">
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => handleDelete(order.order_id)}
+                          className="p-1.5 text-red-500/60 hover:text-red-600 hover:bg-red-500/10 rounded transition-colors"
+                          title="Delete Order"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono text-[10px] text-secondary/60">
+                      {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </td>
+                  </motion.tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </AppLayout>
