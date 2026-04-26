@@ -4,19 +4,14 @@ import { ShoppingCart, Zap, Package, LogOut, MapPin, ChevronDown, Loader2 } from
 import Link from "next/link";
 import OrderProgressWidget from "./OrderProgressWidget";
 
-interface User {
-  user_id: number;
-  name: string;
-  location_node_id: number | null;
-  location_name: string;
-}
+import { UserSession } from "../types";
 
 interface NavbarProps {
-  user: User | null;
+  user: UserSession | null;
   cartCount: number;
   onCartClick: () => void;
   onLogout: () => void;
-  onLocationUpdate?: (newUser: User) => void;
+  onLocationUpdate?: (newUser: UserSession) => void;
 }
 
 export default function Navbar({ user, cartCount, onCartClick, onLogout, onLocationUpdate }: NavbarProps) {

@@ -3,12 +3,7 @@ import { motion } from "framer-motion";
 import { CheckCircle, Clock, Hash, ChevronRight, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export interface OrderResult {
-  order_id: number;
-  path: number[];
-  distance: number;
-  estimated_time: number;
-}
+import { OrderResult } from "../types";
 
 interface Props {
   order: OrderResult;

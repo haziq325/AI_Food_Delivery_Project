@@ -4,29 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ShoppingBag, Plus, Minus, Trash2, Zap } from "lucide-react";
 import OrderSuccessModal from "./OrderSuccessModal";
 
-export interface CartItem {
-  item_id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  restaurant_id: number;
-  restaurant_name: string;
-}
-
-export interface UserSession {
-  user_id: number;
-  name: string;
-  location_node_id: number | null;
-  location_name: string;
-  favorite_ids: number[];
-}
-
-export interface OrderResult {
-  order_id: number;
-  path: number[];
-  distance: number;
-  estimated_time: number;
-}
+import { CartItem, UserSession, OrderResult } from "../types";
+export type { CartItem, UserSession, OrderResult };
 
 interface CartDrawerProps {
   open: boolean;

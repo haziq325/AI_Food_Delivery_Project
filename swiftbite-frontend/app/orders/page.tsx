@@ -6,7 +6,8 @@ import { ArrowLeft, Clock, Hash, Package, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
-import CartDrawer, { CartItem, UserSession } from "../components/CartDrawer";
+import { CartItem, UserSession } from "../types";
+import CartDrawer from "../components/CartDrawer";
 import LiveMap from "../components/LiveMap";
 
 interface Order {
@@ -223,25 +224,42 @@ export default function OrdersPage() {
                   <span className="font-black text-[#957C62] text-sm">Rs. {Number(order.total_price).toLocaleString()}</span>
                 </div>
 
-                {/* Route */}
-                {order.delivery_path && (
+                {/* Intelligence & Tracking Section */}
+                {(order.delivery_path || order.status === "Delivered") && (
                   <div className="mt-4 pt-4 border-t border-[#957C62]/10">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-[10px] font-bold text-[#957C62]/40 uppercase tracking-widest">A* Path Intelligence</p>
-                        <p className="text-[9px] text-[#957C62]/30 font-mono">Real-time network trajectory visualization</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 bg-[#B77466]/5 px-2 py-1 rounded-lg border border-[#B77466]/10">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#B77466] animate-pulse" />
-                        <span className="text-[9px] font-black text-[#B77466] uppercase">Live Tracking</span>
-                      </div>
-                    </div>
+                    {order.delivery_path && (
+                      <>
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <p className="text-[10px] font-bold text-[#957C62]/40 uppercase tracking-widest">A* Path Intelligence</p>
+                            <p className="text-[9px] text-[#957C62]/30 font-mono">Real-time network trajectory visualization</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-[#B77466]/5 px-2 py-1 rounded-lg border border-[#B77466]/10">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#B77466] animate-pulse" />
+                            <span className="text-[9px] font-black text-[#B77466] uppercase">Live Tracking</span>
+                          </div>
+                        </div>
+                        
+                        <LiveMap path={order.delivery_path} status={order.status} />
+
+                        <div className="mt-4 flex items-center gap-1.5 flex-wrap">
+                          {order.delivery_path.split(",").map((node, ni) => (
+                            <span key={ni} className="flex items-center gap-0.5">
+                              <span className="w-5 h-5 rounded-md bg-[#957C62]/5 text-[#957C62]/60 text-[9px] font-black flex items-center justify-center border border-[#957C62]/10">
+                                {node.trim()}
+                              </span>
+                              {ni < (order.delivery_path?.split(",").length || 0) - 1 && (
+                                <span className="text-[#957C62]/20 text-[10px]">→</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    )}
                     
-                    <LiveMap path={order.delivery_path} status={order.status} />
-                    
-                    {/* Rating Section */}
+                    {/* Rating Section - Now always available for Delivered orders */}
                     {order.status === "Delivered" && (
-                      <div className="mt-4 pt-4 border-t border-[#957C62]/10">
+                      <div className={`${order.delivery_path ? "mt-6 pt-6 border-t border-[#957C62]/10" : ""}`}>
                         <p className="text-[10px] font-bold text-[#957C62]/40 uppercase tracking-widest mb-3">Rate your experience</p>
                         <div className="flex flex-col gap-3">
                           <div className="flex items-center gap-2">
@@ -287,19 +305,6 @@ export default function OrdersPage() {
                         </div>
                       </div>
                     )}
-
-                    <div className="mt-4 flex items-center gap-1.5 flex-wrap">
-                      {order.delivery_path.split(",").map((node, ni) => (
-                        <span key={ni} className="flex items-center gap-0.5">
-                          <span className="w-5 h-5 rounded-md bg-[#957C62]/5 text-[#957C62]/60 text-[9px] font-black flex items-center justify-center border border-[#957C62]/10">
-                            {node.trim()}
-                          </span>
-                          {ni < order.delivery_path!.split(",").length - 1 && (
-                            <span className="text-[#957C62]/20 text-[10px]">→</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 )}
               </motion.div>

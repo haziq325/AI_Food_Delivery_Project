@@ -6,7 +6,8 @@ import { Star, Clock, Search, ChevronRight, Sparkles, Heart } from "lucide-react
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
-import CartDrawer, { CartItem, UserSession } from "../components/CartDrawer";
+import { CartItem, UserSession } from "../types";
+import CartDrawer from "../components/CartDrawer";
 
 interface MenuItem {
   item_id: number;
