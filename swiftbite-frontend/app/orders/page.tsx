@@ -19,7 +19,8 @@ interface Order {
   rating: number | null;
   review: string | null;
   created_at: string;
-  order_items: { order_item_id: number; menu_item_name: string; quantity: number }[];
+  restaurant: number;
+  order_items: { order_item_id: number; menu_item: number; menu_item_name: string; quantity: number; price: string }[];
 }
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
@@ -55,6 +56,10 @@ export default function OrdersPage() {
     const saved = localStorage.getItem("swiftbite_cart");
     if (saved) try { setCart(JSON.parse(saved)); } catch { /* ignore */ }
   }, [router]);
+
+  useEffect(() => {
+    localStorage.setItem("swiftbite_cart", JSON.stringify(cart));
+  }, [cart]);
 
   useEffect(() => {
     if (!user) return;
@@ -93,6 +98,23 @@ export default function OrdersPage() {
     } catch (err) {
       console.error("Cancel failed", err);
     }
+  };
+
+  const handleReorder = (order: Order) => {
+    // Construct new cart items
+    const newItems: CartItem[] = order.order_items.map(oi => ({
+      item_id: oi.menu_item,
+      name: oi.menu_item_name,
+      price: Number(oi.price),
+      quantity: oi.quantity,
+      restaurant_id: order.restaurant,
+      restaurant_name: order.restaurant_name
+    }));
+
+    setCart(newItems);
+    setCartOpen(true);
+    // Optionally alert the user
+    // alert("Items added to cart!");
   };
 
   const logout = useCallback(async () => {
@@ -171,6 +193,13 @@ export default function OrdersPage() {
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${STATUS_STYLES[order.status] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
                       {order.status}
                     </span>
+                    <button 
+                      onClick={() => handleReorder(order)}
+                      className="flex items-center gap-1.5 bg-[#B77466] text-white px-3 py-1 rounded-lg text-[10px] font-bold shadow-sm hover:bg-[#9c6052] transition-colors"
+                    >
+                      <Star className="h-3 w-3 fill-white" />
+                      Reorder
+                    </button>
                   </div>
                 </div>
 

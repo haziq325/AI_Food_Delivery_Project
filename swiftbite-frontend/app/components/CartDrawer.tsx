@@ -18,6 +18,7 @@ export interface UserSession {
   name: string;
   location_node_id: number | null;
   location_name: string;
+  favorite_ids: number[];
 }
 
 export interface OrderResult {

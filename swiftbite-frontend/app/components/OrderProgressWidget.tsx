@@ -30,6 +30,13 @@ export default function OrderProgressWidget({ userId }: OrderProgressWidgetProps
     const fetchActiveOrders = async () => {
       try {
         const res = await fetch(`${API}/api/orders/list/?user_id=${userId}`);
+        if (!res.ok) throw new Error("Failed to fetch orders");
+        
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from server");
+        }
+
         const data = await res.json();
         
         if (Array.isArray(data)) {

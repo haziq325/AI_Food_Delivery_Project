@@ -30,4 +30,10 @@ urlpatterns = [
     
     # User Profile APIs
     path('api/users/<int:user_id>/location/', views.update_user_location, name='update-user-location'),
+    path('api/users/<int:user_id>/favorites/', views.toggle_favorite, name='toggle-favorite'),
+
+    # Logistics/Rider APIs
+    path('api/riders/', views.RiderListView.as_view(), name='rider-list'),
+    path('api/orders/<int:order_id>/assign/', views.assign_rider, name='assign-rider'),
+    path('api/analytics/', views.analytics_dashboard, name='analytics-dashboard'),
 ]

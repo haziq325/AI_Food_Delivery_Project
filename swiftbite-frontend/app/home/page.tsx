@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, Clock, Search, ChevronRight, Sparkles } from "lucide-react";
+import { Star, Clock, Search, ChevronRight, Sparkles, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
@@ -127,11 +127,43 @@ export default function HomePage() {
     router.push("/login");
   }, [router]);
 
+  const toggleFavorite = async (restaurant_id: number) => {
+    if (!user) return;
+    try {
+      const res = await fetch(`${API}/api/users/${user.user_id}/favorites/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restaurant_id }),
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        const currentIds = user.favorite_ids || [];
+        const newIds = data.action === "added" 
+          ? [...currentIds, restaurant_id]
+          : currentIds.filter(id => id !== restaurant_id);
+          
+        const newUser = { ...user, favorite_ids: newIds };
+        setUser(newUser);
+        // Update cookie
+        document.cookie = `swiftbite_user=${encodeURIComponent(JSON.stringify(newUser))}; path=/`;
+      }
+    } catch (e) {
+      console.error("Failed to toggle favorite", e);
+    }
+  };
+
   const filtered = restaurants.filter((r) => {
     const matchCuisine = cuisine === "All" || r.cuisine === cuisine;
     const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
       r.cuisine.toLowerCase().includes(search.toLowerCase());
     return matchCuisine && matchSearch;
+  }).sort((a, b) => {
+    // Favorites first
+    const aFav = (user?.favorite_ids || []).includes(a.restaurant_id) ? 1 : 0;
+    const bFav = (user?.favorite_ids || []).includes(b.restaurant_id) ? 1 : 0;
+    if (aFav !== bFav) return bFav - aFav;
+    // Then by rating
+    return b.rating - a.rating;
   });
 
   const cartTotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
@@ -234,13 +266,19 @@ export default function HomePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <AnimatePresence mode="popLayout">
                 {filtered.map((r, i) => (
-                  <motion.div key={r.restaurant_id}
-                    layout
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: i * 0.03 }}>
-                    <Link href={`/restaurant/${r.restaurant_id}`}>
+                  <motion.div key={r.restaurant_id} layout
+                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                    className="group relative bg-[#FFE1AF] rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-[#957C62]/10">
+                    
+                    {/* Heart Button */}
+                    <button 
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(r.restaurant_id); }}
+                      className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/40 transition-all border border-white/30"
+                    >
+                      <Heart className={`h-5 w-5 transition-colors ${(user?.favorite_ids || []).includes(r.restaurant_id) ? "fill-red-500 text-red-500" : "text-white"}`} />
+                    </button>
+
+                    <Link href={`/restaurant/${r.restaurant_id}`} className="block">
                       <div className="glass-card rounded-2xl overflow-hidden cursor-pointer hover:shadow-xl hover:shadow-[#B77466]/8 transition-all group border border-transparent hover:border-[#B77466]/15 flex flex-col h-full">
                         {/* Image Header */}
                         <div className="relative h-40 w-full bg-[#957C62]/10 overflow-hidden">

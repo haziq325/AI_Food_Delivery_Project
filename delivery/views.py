@@ -5,10 +5,11 @@ from django.db import connection
 import requests
 import joblib
 import pandas as pd
+import os
 
 from delivery_brain import get_restaurant_node, calculate_shortest_path, calculate_shortest_path_astar, get_current_traffic_condition
-from .models import MapNode, MapEdge, Restaurant, MenuItem, User, Order, OrderItem
-from .serializers import MapNodeSerializer, MapEdgeSerializer, RestaurantSerializer, MenuItemSerializer, OrderSerializer
+from .models import MapNode, MapEdge, Restaurant, MenuItem, User, Order, OrderItem, Rider
+from .serializers import MapNodeSerializer, MapEdgeSerializer, RestaurantSerializer, MenuItemSerializer, OrderSerializer, RiderSerializer
 
 
 @api_view(['POST'])
@@ -34,6 +35,7 @@ def user_login(request):
                 'email': user.email,
                 'location_node_id': user.location.node_id if user.location else None,
                 'location_name': user.location.name if user.location else 'Unknown',
+                'favorite_ids': list(user.favorites.values_list('pk', flat=True))
             }
         })
     except User.DoesNotExist:
@@ -333,19 +335,23 @@ def place_order_with_path(request):
         import requests
         load_dotenv()
         
-        n8n_webhook_url = os.environ.get('N8N_WEBHOOK_URL', "https://sibyl-tetradynamous-griselda.ngrok-free.dev/webhook-test/order-placed")
+        n8n_webhook_url = os.environ.get('N8N_WEBHOOK_URL', "https://sibyl-tetradynamous-griselda.ngrok-free.dev/webhook/order-placed")
         
         try:
+            # Get the first item from the order for the webhook
+            first_oi = OrderItem.objects.filter(order=order).first()
+            item_name = first_oi.menu_item.name if first_oi else "Custom Order"
+            
             n8n_data = {
                 "customer_name": user.name,
                 "customer_email": user.email,
                 "restaurant_name": restaurant.name,
-                "item_name": first_item.name if first_item else "Custom Order",
-                "quantity": 1,
+                "item_name": item_name,
+                "quantity": total_qty,
                 "total_price": float(order.total_price) if order.total_price else 0.0
             }
-            requests.post(n8n_webhook_url, json=n8n_data, timeout=3)
-            print("Webhook fired to n8n successfully from pathfinder!")
+            requests.post(n8n_webhook_url, json=n8n_data, timeout=5)
+            print(f"Webhook fired to n8n successfully: {item_name}")
         except Exception as e:
             print(f"n8n webhook failed: {e}")
         
@@ -406,6 +412,12 @@ def update_order_status(request, order_id):
         if status:
             order.status = status
             order.save()
+            
+            # If Delivered or Cancelled, free the rider
+            if (status == 'Delivered' or status == 'Cancelled') and order.rider:
+                order.rider.status = 'Available'
+                order.rider.save()
+                
             return Response({"status": "success", "order_id": order_id, "new_status": status})
         return Response({"error": "No status provided"}, status=400)
     except Order.DoesNotExist:
@@ -499,3 +511,84 @@ def get_restaurant_reviews(request, restaurant_id):
         return Response(data)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def toggle_favorite(request, user_id):
+    """
+    Heart/Unheart a restaurant for a user.
+    """
+    restaurant_id = request.data.get('restaurant_id')
+    try:
+        user = User.objects.get(pk=user_id)
+        restaurant = Restaurant.objects.get(pk=restaurant_id)
+        
+        if user.favorites.filter(pk=restaurant_id).exists():
+            user.favorites.remove(restaurant)
+            status = "removed"
+        else:
+            user.favorites.add(restaurant)
+            status = "added"
+            
+        return Response({"status": "success", "action": status})
+    except (User.DoesNotExist, Restaurant.DoesNotExist):
+        return Response({"error": "User or Restaurant not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+class RiderListView(generics.ListAPIView):
+    queryset = Rider.objects.all()
+    serializer_class = RiderSerializer
+
+@api_view(['POST'])
+def assign_rider(request, order_id):
+    rider_id = request.data.get('rider_id')
+    try:
+        order = Order.objects.get(pk=order_id)
+        rider = Rider.objects.get(pk=rider_id)
+        order.rider = rider
+        order.status = 'Out for Delivery'
+        order.save()
+        rider.status = 'Busy'
+        rider.save()
+        return Response({"status": "success", "rider": rider.name})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+def analytics_dashboard(request):
+    from django.db.models import Sum, Count, Avg
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db import models
+
+    # 1. Revenue Analytics
+    total_revenue = Order.objects.filter(status='Delivered').aggregate(Sum('total_price'))['total_price__sum'] or 0
+    
+    # Daily Revenue (Last 7 Days)
+    today = timezone.now().date()
+    revenue_last_7_days = []
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        rev = Order.objects.filter(status='Delivered', created_at__date=day).aggregate(Sum('total_price'))['total_price__sum'] or 0
+        revenue_last_7_days.append({"day": day.strftime('%a'), "revenue": float(rev)})
+
+    # 2. Restaurant Performance
+    top_restaurants = Order.objects.values('restaurant__name').annotate(orders=Count('order_id')).order_by('-orders')[:5]
+    restaurant_data = [{"name": r['restaurant__name'], "orders": r['orders']} for r in top_restaurants]
+
+    # 3. Delivery Metrics
+    avg_wait = Restaurant.objects.aggregate(Avg('average_delivery_time'))['average_delivery_time__avg'] or 0
+    
+    # 4. Fleet Status
+    fleet = Rider.objects.aggregate(
+        available=Count('rider_id', filter=models.Q(status='Available')), 
+        busy=Count('rider_id', filter=models.Q(status='Busy'))
+    )
+
+    return Response({
+        "total_revenue": float(total_revenue),
+        "revenue_history": revenue_last_7_days,
+        "top_restaurants": restaurant_data,
+        "avg_delivery_time": round(float(avg_wait), 1),
+        "fleet_status": fleet
+    })
