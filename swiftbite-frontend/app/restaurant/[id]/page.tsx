@@ -60,7 +60,7 @@ const RESTAURANT_IMAGES: Record<string, string> = {
   "Chop Chop Wok": "https://res.cloudinary.com/foodoplanet/image/upload/v1564317641/Chop-Chop-Wok-Karachi_lwuqi5.jpg",
   "California Pizza": "https://images.deliveryhero.io/image/fd-pk/LH/s1id-hero.jpg",
   "14th Street Pizza": "https://4.bp.blogspot.com/-En-WSc78dHE/T2jM0XuPGNI/AAAAAAAAADs/_45ZIZyKLu4/s640/14th-Street-Pizza-in-karachi.jpg",
-  "Kaybees": "https://www.kaybees.com.pk/_next/image?url=https:%2F%2Fassets.indolj.io%2Fimages%2F1695220718-wdfg.jpeg&w=1080&q=75",
+  "Kaybees": "https://oocmjiuymmvwvyvwlfpd.supabase.co/storage/v1/object/public/Project/download%20(3).jpg",
   "OPTP": "https://images.deliveryhero.io/image/fd-pk/LH/w2ae-hero.jpg",
   "Zameer Ansari": "https://oocmjiuymmvwvyvwlfpd.supabase.co/storage/v1/object/public/Project/download%20(1).jpg",
   "Javed Nihari": "https://img.restaurantguru.com/c334-Restaurant-Javed-Nihari-food.jpg",
@@ -301,12 +301,12 @@ export default function RestaurantPage() {
         {/* Reviews Section */}
         <div className="mt-12 mb-20">
           <h2 className="text-lg font-black text-[#957C62] mb-5 flex items-center gap-2">
-            Reviews 
+            Reviews
             <span className="text-xs font-bold text-[#957C62]/40 bg-[#957C62]/5 px-2 py-0.5 rounded-full">
               {reviews.length}
             </span>
           </h2>
-          
+
           {reviewsLoading ? (
             <div className="space-y-3">
               {[...Array(2)].map((_, i) => (
@@ -320,7 +320,7 @@ export default function RestaurantPage() {
           ) : (
             <div className="space-y-4">
               {reviews.map((rev, i) => (
-                <motion.div 
+                <motion.div
                   key={i}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}

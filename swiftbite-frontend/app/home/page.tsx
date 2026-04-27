@@ -58,7 +58,7 @@ const RESTAURANT_IMAGES: Record<string, string> = {
   "Chop Chop Wok": "https://res.cloudinary.com/foodoplanet/image/upload/v1564317641/Chop-Chop-Wok-Karachi_lwuqi5.jpg",
   "California Pizza": "https://images.deliveryhero.io/image/fd-pk/LH/s1id-hero.jpg",
   "14th Street Pizza": "https://4.bp.blogspot.com/-En-WSc78dHE/T2jM0XuPGNI/AAAAAAAAADs/_45ZIZyKLu4/s640/14th-Street-Pizza-in-karachi.jpg",
-  "Kaybees": "https://www.kaybees.com.pk/_next/image?url=https:%2F%2Fassets.indolj.io%2Fimages%2F1695220718-wdfg.jpeg&w=1080&q=75",
+  "Kaybees": "https://oocmjiuymmvwvyvwlfpd.supabase.co/storage/v1/object/public/Project/download%20(3).jpg",
   "OPTP": "https://images.deliveryhero.io/image/fd-pk/LH/w2ae-hero.jpg",
   "Zameer Ansari": "https://oocmjiuymmvwvyvwlfpd.supabase.co/storage/v1/object/public/Project/download%20(1).jpg",
   "Javed Nihari": "https://img.restaurantguru.com/c334-Restaurant-Javed-Nihari-food.jpg",
@@ -139,10 +139,10 @@ export default function HomePage() {
       const data = await res.json();
       if (data.status === "success") {
         const currentIds = user.favorite_ids || [];
-        const newIds = data.action === "added" 
+        const newIds = data.action === "added"
           ? [...currentIds, restaurant_id]
           : currentIds.filter(id => id !== restaurant_id);
-          
+
         const newUser = { ...user, favorite_ids: newIds };
         setUser(newUser);
         // Update cookie
@@ -201,8 +201,8 @@ export default function HomePage() {
           {CUISINES.map((c) => (
             <button key={c} onClick={() => setCuisine(c)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all ${cuisine === c
-                  ? "bg-[#B77466] text-white shadow-md shadow-[#B77466]/25"
-                  : "bg-white/50 text-[#957C62] hover:bg-white/80 border border-[#957C62]/10"
+                ? "bg-[#B77466] text-white shadow-md shadow-[#B77466]/25"
+                : "bg-white/50 text-[#957C62] hover:bg-white/80 border border-[#957C62]/10"
                 }`}>
               {CUISINE_EMOJIS[c] || "🍽️"} {c}
             </button>
@@ -270,9 +270,9 @@ export default function HomePage() {
                   <motion.div key={r.restaurant_id} layout
                     initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                     className="group relative bg-[#FFE1AF] rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-[#957C62]/10">
-                    
+
                     {/* Heart Button */}
-                    <button 
+                    <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleFavorite(r.restaurant_id); }}
                       className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/40 transition-all border border-white/30"
                     >

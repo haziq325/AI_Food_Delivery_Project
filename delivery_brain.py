@@ -17,6 +17,41 @@ django.setup()
 from delivery.models import Restaurant, MapNode, MapEdge
 
 # ==========================================
+# 0. GLOBAL CACHE (PERFORMANCE OPTIMIZATION)
+# ==========================================
+_GRAPH_CACHE = None
+_NODE_CACHE = None
+_LAST_CACHE_UPDATE = 0
+CACHE_TTL = 300  # Refresh map every 5 minutes if needed
+
+def get_cached_graph_and_nodes():
+    """Retrieves the map from memory if available, otherwise builds it from DB."""
+    global _GRAPH_CACHE, _NODE_CACHE, _LAST_CACHE_UPDATE
+    import networkx as nx
+    import time
+    
+    now = time.time()
+    # Only rebuild if cache is empty or expired
+    if _GRAPH_CACHE is None or (now - _LAST_CACHE_UPDATE) > CACHE_TTL:
+        # print("🔄 Building Map Cache from Database...")
+        graph = nx.Graph()
+        nodes = {n.node_id: n for n in MapNode.objects.all()}
+        edges = MapEdge.objects.all()
+        
+        for edge in edges:
+            u, v = edge.from_node.node_id, edge.to_node.node_id
+            # Store distance in 'original_distance' to allow traffic multipliers to be applied fresh
+            graph.add_edge(u, v, original_distance=float(edge.distance))
+            
+        _GRAPH_CACHE = graph
+        _NODE_CACHE = nodes
+        _LAST_CACHE_UPDATE = now
+        # print(f"✅ Map Cache Ready: {len(nodes)} nodes, {len(edges)} edges.")
+        
+    return _GRAPH_CACHE.copy(), _NODE_CACHE
+
+
+# ==========================================
 # 1. SEARCH CAPABILITY
 # ==========================================
 def get_restaurant_node(restaurant_name):
@@ -72,20 +107,19 @@ def calculate_shortest_path(start_id, end_id, traffic_level="auto", blocked_edge
     multiplier = traffic_multipliers.get(traffic_level.lower(), 1.0)
 
     import networkx as nx
-    # 1. Build the graph dynamically from the Database
-    graph = nx.Graph()
-    edges = MapEdge.objects.all()
+    # 1. Use the Cached Graph instead of querying the DB
+    graph, _ = get_cached_graph_and_nodes()
     
-    for edge in edges:
-        u = edge.from_node.node_id
-        v = edge.to_node.node_id
-
-        # ROAD CLOSURE CHECK (Task 3)
+    # 2. Apply dynamic factors (Traffic & Blocked Edges)
+    # Convert to list to avoid RuntimeError: dictionary changed size during iteration
+    for u, v, data in list(graph.edges(data=True)):
+        # ROAD CLOSURE CHECK
         if blocked_edges and ((u, v) in blocked_edges or (v, u) in blocked_edges):
+            graph.remove_edge(u, v)
             continue
-
-        weight = float(edge.distance) * multiplier 
-        graph.add_edge(u, v, weight=weight)
+            
+        # Apply traffic to the original distance
+        data['weight'] = data['original_distance'] * multiplier
 
     # 2. Run Dijkstra's Algorithm via NetworkX
     try:
@@ -105,29 +139,25 @@ def calculate_shortest_path_astar(start_id, end_id, traffic_level="auto", blocke
     traffic_multipliers = { "light": 0.8, "normal": 1.0, "heavy": 1.5, "jammed": 2.5 }
     multiplier = traffic_multipliers.get(traffic_level.lower(), 1.0)
     
-    # Pre-fetch nodes for heuristic calculation
-    nodes = {n.node_id: n for n in MapNode.objects.all()}
+    import networkx as nx
+    # 1. Use Cached Graph and Nodes
+    graph, nodes = get_cached_graph_and_nodes()
+    
     if start_id not in nodes or end_id not in nodes:
          return float('inf'), []
+
+    # 2. Apply dynamic factors
+    for u, v, data in list(graph.edges(data=True)):
+        if blocked_edges and ((u, v) in blocked_edges or (v, u) in blocked_edges):
+            graph.remove_edge(u, v)
+            continue
+        data['weight'] = data['original_distance'] * multiplier
 
     def heuristic(u, v):
         n1 = nodes.get(u)
         n2 = nodes.get(v)
         if not n1 or not n2: return 0
-        # Euclidean distance heuristic
         return math.sqrt((n1.x_coordinate - n2.x_coordinate)**2 + (n1.y_coordinate - n2.y_coordinate)**2)
-
-    import networkx as nx
-    graph = nx.Graph()
-    edges = MapEdge.objects.all()
-    
-    for edge in edges:
-        u = edge.from_node.node_id
-        v = edge.to_node.node_id
-        if blocked_edges and ((u, v) in blocked_edges or (v, u) in blocked_edges):
-            continue
-        weight = float(edge.distance) * multiplier 
-        graph.add_edge(u, v, weight=weight)
 
     try:
         path = nx.astar_path(graph, source=start_id, target=end_id, heuristic=heuristic, weight='weight')

@@ -25,22 +25,44 @@ class Migration(migrations.Migration):
                 v_order_id INT;
                 v_item_price NUMERIC(8, 2);
                 v_total_price NUMERIC(8, 2);
+                v_rest_x DOUBLE PRECISION;
+                v_rest_y DOUBLE PRECISION;
+                v_rider_id INT;
             BEGIN
-                -- 1. Get the price of the requested menu item
-                -- FIXED: Changed 'id' to 'item_id' to match your Django model!
+                -- 1. Get restaurant coordinates for distance calculation
+                SELECT n.x_coordinate, n.y_coordinate INTO v_rest_x, v_rest_y
+                FROM delivery_restaurant r
+                JOIN delivery_mapnode n ON r.location_node_id = n.node_id
+                WHERE r.restaurant_id = p_restaurant_id;
+
+                -- 2. Find the nearest available rider (using Euclidean distance)
+                -- We use the Pythagorean theorem (x^2 + y^2) to find the closest point
+                SELECT r.rider_id INTO v_rider_id
+                FROM delivery_rider r
+                JOIN delivery_mapnode n ON r.current_location_id = n.node_id
+                WHERE r.status = 'Available'
+                ORDER BY ((n.x_coordinate - v_rest_x)^2 + (n.y_coordinate - v_rest_y)^2) ASC
+                LIMIT 1;
+
+                -- 3. Get the price of the requested menu item
                 SELECT price INTO v_item_price 
                 FROM delivery_menuitem 
                 WHERE item_id = p_menu_item_id;
 
-                -- 2. Calculate the total price
+                -- 4. Calculate the total price
                 v_total_price := v_item_price * p_quantity;
 
-                -- 3. Create the Order and get the new auto-generated order_id
-                INSERT INTO delivery_order (user_id, restaurant_id, total_price, status)
-                VALUES (p_user_id, p_restaurant_id, v_total_price, 'Pending')
+                -- 5. Create the Order and assign the rider (if found)
+                INSERT INTO delivery_order (user_id, restaurant_id, rider_id, total_price, status, created_at)
+                VALUES (p_user_id, p_restaurant_id, v_rider_id, v_total_price, CASE WHEN v_rider_id IS NOT NULL THEN 'Out for Delivery' ELSE 'Pending' END, NOW())
                 RETURNING order_id INTO v_order_id;
 
-                -- 4. Create the connected OrderItem
+                -- 6. Update Rider status to Busy so they aren't assigned elsewhere
+                IF v_rider_id IS NOT NULL THEN
+                    UPDATE delivery_rider SET status = 'Busy' WHERE rider_id = v_rider_id;
+                END IF;
+
+                -- 7. Create the connected OrderItem
                 INSERT INTO delivery_orderitem (order_id, menu_item_id, quantity)
                 VALUES (v_order_id, p_menu_item_id, p_quantity);
                 

@@ -180,7 +180,12 @@ export default function DispatchPage() {
                         <p className="font-bold text-secondary text-xs">{order.restaurant_name}</p>
                       </td>
                       <td className="px-6 py-4">
-                        {order.status === 'Preparing' || order.status === 'Pending' ? (
+                        {order.rider_details ? (
+                          <div className="flex items-center gap-1.5 text-[10px] text-secondary/70 font-bold uppercase tracking-tight">
+                            <Bike className="h-3 w-3" />
+                            {order.rider_details.name}
+                          </div>
+                        ) : (order.status === 'Preparing' || order.status === 'Pending') ? (
                           <div className="flex items-center gap-2">
                             <select 
                               className="text-[10px] bg-secondary/5 border border-secondary/10 rounded px-2 py-1 outline-none focus:border-secondary/30"
@@ -199,11 +204,6 @@ export default function DispatchPage() {
                             >
                               Assign
                             </button>
-                          </div>
-                        ) : order.rider_details ? (
-                          <div className="flex items-center gap-1.5 text-[10px] text-secondary/70 font-bold uppercase tracking-tight">
-                            <Bike className="h-3 w-3" />
-                            {order.rider_details.name}
                           </div>
                         ) : (
                           <span className="text-[10px] text-secondary/30 italic">No rider assigned</span>

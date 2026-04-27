@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS Restaurants;
 DROP TABLE IF EXISTS Users;
 DROP TABLE IF EXISTS MapEdges;
 DROP TABLE IF EXISTS MapNodes;
+DROP TABLE IF EXISTS Riders;
 
 -- MapNodes Table
 CREATE TABLE MapNodes (
@@ -21,6 +22,16 @@ CREATE TABLE MapEdges (
     StartsAt INTEGER NOT NULL REFERENCES MapNodes(Node_id) ON DELETE CASCADE,
     EndsAt INTEGER NOT NULL REFERENCES MapNodes(Node_id) ON DELETE CASCADE,
     Distance DOUBLE PRECISION NOT NULL CHECK (Distance > 0)
+);
+
+-- Riders Table
+CREATE TABLE Riders (
+    Rider_id SERIAL PRIMARY KEY,
+    Name VARCHAR(255) NOT NULL,
+    Phone VARCHAR(20),
+    Vehicle_type VARCHAR(50) DEFAULT 'Bike',
+    Current_location INTEGER REFERENCES MapNodes(Node_id) ON DELETE SET NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'Available'
 );
 
 -- Users Table
@@ -58,6 +69,7 @@ CREATE TABLE Orders (
     Order_id SERIAL PRIMARY KEY,
     User_id INTEGER NOT NULL REFERENCES Users(User_id) ON DELETE CASCADE,
     Restaurant_id INTEGER NOT NULL REFERENCES Restaurants(Restaurant_id) ON DELETE CASCADE,
+    Rider_id INTEGER REFERENCES Riders(Rider_id) ON DELETE SET NULL,
     Total_Price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     Status VARCHAR(50) NOT NULL DEFAULT 'Pending',
     Rating INTEGER NULL CHECK (Rating >= 1 AND Rating <= 5),

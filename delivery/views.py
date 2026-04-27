@@ -293,12 +293,31 @@ def place_order_with_path(request):
         if not path_nodes:
              return Response({"error": "No valid path found between nodes"}, status=404)
              
+        # --- AUTOMATIC RIDER ASSIGNMENT ---
+        # Find nearest available rider using simple Python distance calc
+        import math
+        rider = None
+        rest_x = restaurant.location_node.x_coordinate
+        rest_y = restaurant.location_node.y_coordinate
+        available_riders = Rider.objects.filter(status='Available').select_related('current_location')
+        best_dist = float('inf')
+        for r in available_riders:
+            if r.current_location:
+                d = math.sqrt((r.current_location.x_coordinate - rest_x)**2 + (r.current_location.y_coordinate - rest_y)**2)
+                if d < best_dist:
+                    best_dist = d
+                    rider = r
+        if rider:
+            rider.status = 'Busy'
+            rider.save()
+             
         # Create the order
         order = Order.objects.create(
             user=user,
             restaurant=restaurant,
+            rider=rider, # Link the assigned rider
             delivery_path=",".join(map(str, path_nodes)),
-            status='Pending'
+            status='Out for Delivery' if rider else 'Pending'
         )
 
         # Process actual items
@@ -405,6 +424,10 @@ def update_order_status(request, order_id):
         order = Order.objects.get(pk=order_id)
         
         if request.method == 'DELETE':
+            # If a rider was assigned, free them before deleting the order
+            if order.rider:
+                order.rider.status = 'Available'
+                order.rider.save()
             order.delete()
             return Response({"status": "success", "message": "Order deleted"})
             
